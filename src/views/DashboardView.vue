@@ -6,8 +6,8 @@
         <p>Visão geral do inventário municipal de mídia exterior.</p>
       </div>
       <div class="header-actions">
-        <v-btn variant="outlined" prepend-icon="mdi-download" @click="exportJson">Exportar</v-btn>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="$emit('navigate', 'inventory')">Novo Cadastro</v-btn>
+        <v-btn v-if="auth.canWrite" variant="outlined" prepend-icon="mdi-download" @click="exportJson">Exportar</v-btn>
+        <v-btn v-if="auth.canWrite" color="primary" prepend-icon="mdi-plus" @click="$emit('navigate', 'inventory')">Novo Cadastro</v-btn>
       </div>
     </div>
 
@@ -25,7 +25,7 @@
     </v-row>
 
     <v-row>
-      <v-col cols="12" lg="8">
+      <v-col cols="12">
         <v-card border class="pa-5">
           <div class="card-title-row">
             <h3>Ativos por Tipo de Veículo</h3>
@@ -55,7 +55,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" lg="4">
+      <v-col cols="12">
         <v-card border class="pa-5 activity-card">
           <h3>Atividades Recentes</h3>
           <div v-if="media.activities.length === 0" class="empty-state compact">
@@ -86,12 +86,14 @@ import { computed } from 'vue';
 
 import { MEDIA_TYPE_OPTIONS, mediaTypeColor, mediaTypeLabel } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
+import { useAuthStore } from '../stores/auth';
 import type { ActivityType } from '../types';
 import { formatDateTime } from '../utils/format';
 
 defineEmits<{ navigate: ['dashboard' | 'map' | 'inventory'] }>();
 
 const media = useMediaStore();
+const auth = useAuthStore();
 
 const kpis = computed(() => [
   {
@@ -119,9 +121,9 @@ const kpis = computed(() => [
     className: 'green',
   },
   {
-    label: 'Reprovados',
+    label: 'Irregulares',
     value: media.stats.rejected,
-    caption: 'Solicitações indeferidas',
+    caption: 'Solicitações irregulares',
     icon: 'mdi-alert-octagon-outline',
     color: 'error',
     className: 'red',

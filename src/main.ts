@@ -6,14 +6,11 @@ import './styles/main.css';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import { createVuetify } from 'vuetify';
-import * as components from 'vuetify/components';
-import * as directives from 'vuetify/directives';
 
 import App from './App.vue';
+import { router } from './router';
 
 const vuetify = createVuetify({
-  components,
-  directives,
   theme: {
     defaultTheme: 'geomidiaLight',
     themes: {
@@ -40,4 +37,4 @@ const vuetify = createVuetify({
   },
 });
 
-createApp(App).use(createPinia()).use(vuetify).mount('#app');
+createApp(App).use(createPinia()).use(router).use(vuetify).mount('#app');

@@ -5,7 +5,7 @@
         <h2>Inventário de Ativos de Mídia</h2>
         <p>Cadastre, revise e localize veículos de comunicação exterior.</p>
       </div>
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">
+      <v-btn v-if="auth.canWrite" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">
         Novo Cadastro
       </v-btn>
     </div>
@@ -74,12 +74,13 @@
               </td>
               <td>
                 <v-chip :color="statusColor(asset.status)" size="small" variant="tonal">
-                  {{ asset.status }}
+                  {{ statusLabel(asset.status) }}
                 </v-chip>
               </td>
               <td>
                 <div class="row-actions">
                   <v-btn
+                    v-if="auth.canWrite"
                     icon="mdi-eye-outline"
                     size="small"
                     variant="tonal"
@@ -87,6 +88,7 @@
                     @click="$emit('view-map', asset.id)"
                   />
                   <v-btn
+                    v-if="auth.canDelete"
                     icon="mdi-pencil-outline"
                     size="small"
                     variant="tonal"
@@ -108,8 +110,8 @@
         </v-table>
       </div>
       <div class="table-footer">
-        <span>Total cadastrado: {{ media.assets.length }}</span>
-        <span>Exibindo {{ filteredAssets.length }} de {{ media.assets.length }}</span>
+        <span>Total cadastrado: {{ media.assetTotal }}</span>
+        <span>Exibindo {{ filteredAssets.length }} de {{ media.assetTotal }}</span>
       </div>
     </v-card>
 
@@ -123,10 +125,10 @@
         </v-card-subtitle>
 
         <v-card-text>
-          <v-form class="form-grid" @submit.prevent="save">
+          <v-form v-model="formValid" class="form-grid" @submit.prevent="save">
             <v-select
               v-model="form.media_type"
-              :items="MEDIA_TYPE_OPTIONS"
+              :items="registrationMediaTypeOptions"
               label="Tipo de veículo"
             />
             <v-select
@@ -137,6 +139,7 @@
             <v-text-field
               v-model="form.address"
               label="Endereço completo"
+              :rules="[required, minLength(3)]"
               class="span-2"
             />
             <v-text-field
@@ -144,22 +147,28 @@
               label="Latitude"
               type="number"
               step="any"
+              :rules="[coordinateRule(-20.65, -20.30, 'Latitude')]"
             />
             <v-text-field
               v-model.number="form.longitude"
               label="Longitude"
               type="number"
               step="any"
+              :rules="[coordinateRule(-54.80, -54.40, 'Longitude')]"
             />
             <v-text-field
               v-model.number="form.area_m2"
               label="Área total (m²)"
               type="number"
+              min="0.01"
+              :rules="[positive]"
             />
             <v-text-field
               v-model.number="form.width_m"
               label="Largura (m)"
               type="number"
+              min="0"
+              :rules="[nonNegative]"
             />
             <v-text-field
               v-model.number="form.bottom_height_m"
@@ -191,13 +200,55 @@
               rows="3"
               class="span-2"
             />
+            <div class="attachment-crud span-2">
+              <div class="attachment-crud-header">
+                <strong>Links de anexos</strong>
+                <span>Fotos, PDFs e arquivos relacionados</span>
+              </div>
+              <div class="attachment-crud-row">
+                <v-text-field
+                  v-model="attachmentLinkDraft"
+                  label="Adicionar link"
+                  placeholder="https://..."
+                  hide-details
+                  @keydown.enter.prevent="addAttachmentLink"
+                />
+                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addAttachmentLink">
+                  Adicionar
+                </v-btn>
+              </div>
+              <div v-if="attachmentLinks.length" class="attachment-link-list">
+                <div v-for="(link, index) in attachmentLinks" :key="`${link}-${index}`" class="attachment-link-item">
+                  <v-btn
+                    :href="link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="text"
+                    density="comfortable"
+                    prepend-icon="mdi-open-in-new"
+                    class="attachment-link-button"
+                  >
+                    {{ link }}
+                  </v-btn>
+                  <v-btn
+                    icon="mdi-close"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    title="Remover link"
+                    @click="removeAttachmentLink(index)"
+                  />
+                </div>
+              </div>
+              <div v-else class="attachment-link-empty">Nenhum link adicionado ainda.</div>
+            </div>
           </v-form>
         </v-card-text>
 
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="media.loading" @click="save">Salvar Cadastro</v-btn>
+          <v-btn color="primary" :loading="media.saving" :disabled="!formValid" @click="save">Salvar Cadastro</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -211,7 +262,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="deleteTarget = null">Cancelar</v-btn>
-          <v-btn color="error" :loading="media.loading" @click="confirmDelete">Excluir</v-btn>
+          <v-btn color="error" :loading="media.saving" @click="confirmDelete">Excluir</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -226,27 +277,44 @@ import {
   MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
   getRequiredRadius,
+  mediaTypeOptionsFromRules,
   mediaTypeLabel,
+  statusLabel,
   statusColor,
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
+import { useAuthStore } from '../stores/auth';
 import type { MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { formatCoordinate } from '../utils/format';
+import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 
 defineEmits<{ 'view-map': [id: string] }>();
 
 const media = useMediaStore();
+const auth = useAuthStore();
 const search = ref('');
 const typeFilter = ref<MediaType | 'all'>('all');
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
+const formValid = ref(false);
+const attachmentLinkDraft = ref('');
+const attachmentLinks = ref<string[]>([]);
+const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
+const minLength = (length: number) => (value: string) => value.trim().length >= length || `Mínimo de ${length} caracteres.`;
+const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior que zero.';
+const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
+const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
+  (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
+);
 
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
   ...MEDIA_TYPE_OPTIONS,
 ]);
+
+const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
 
 const statusFilterOptions = computed(() => [
   { title: 'Todos os status', value: 'all' },
@@ -262,7 +330,7 @@ const deleteDialog = computed({
   },
 });
 
-const calculatedRadius = computed(() => getRequiredRadius(form.media_type, Number(form.area_m2 || 0)));
+const calculatedRadius = computed(() => getRequiredRadius(form.media_type, Number(form.area_m2 || 0), media.rules));
 
 const filteredAssets = computed(() => {
   const term = search.value.trim().toLowerCase();
@@ -291,11 +359,30 @@ function blankForm(): MediaAssetInput {
     width_m: 9,
     bottom_height_m: 5,
     top_height_m: null,
-    status: 'Pendente',
+    status: 'análise',
     justification: '',
+    attachment_links: '',
     contact_name: '',
     contact_email: '',
   };
+}
+
+function resetAttachmentLinks(value: string | null | undefined = '') {
+  attachmentLinks.value = parseAttachmentLinks(value);
+  attachmentLinkDraft.value = '';
+}
+
+function addAttachmentLink() {
+  const link = normalizeAttachmentLink(attachmentLinkDraft.value);
+  if (!link) return;
+  if (!attachmentLinks.value.includes(link)) {
+    attachmentLinks.value = [...attachmentLinks.value, link];
+  }
+  attachmentLinkDraft.value = '';
+}
+
+function removeAttachmentLink(index: number) {
+  attachmentLinks.value = attachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
 }
 
 function sanitizeForm(): MediaAssetInput {
@@ -304,6 +391,7 @@ function sanitizeForm(): MediaAssetInput {
     width_m: form.width_m || null,
     top_height_m: form.top_height_m || null,
     justification: form.justification || null,
+    attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
     contact_name: form.contact_name || null,
     contact_email: form.contact_email || null,
   };
@@ -312,6 +400,7 @@ function sanitizeForm(): MediaAssetInput {
 function openCreateDialog() {
   editingId.value = null;
   Object.assign(form, blankForm());
+  resetAttachmentLinks('');
   dialog.value = true;
 }
 
@@ -329,27 +418,36 @@ function openEditDialog(asset: MediaAsset) {
     top_height_m: asset.top_height_m ?? null,
     status: asset.status,
     justification: asset.justification ?? '',
+    attachment_links: asset.attachment_links ?? '',
     contact_name: asset.contact_name ?? '',
     contact_email: asset.contact_email ?? '',
   });
+  resetAttachmentLinks(asset.attachment_links);
   dialog.value = true;
 }
 
 async function save() {
-  if (!form.address.trim()) return;
+  if (!formValid.value || !form.address.trim()) return;
 
-  if (editingId.value) {
-    await media.updateAsset(editingId.value, sanitizeForm());
-  } else {
-    await media.createAsset(sanitizeForm());
+  try {
+    if (editingId.value) {
+      await media.updateAsset(editingId.value, sanitizeForm());
+    } else {
+      await media.createAsset(sanitizeForm());
+    }
+    dialog.value = false;
+  } catch {
+    // O store publica o erro no alerta global.
   }
-
-  dialog.value = false;
 }
 
 async function confirmDelete() {
   if (!deleteTarget.value) return;
-  await media.deleteAsset(deleteTarget.value.id);
-  deleteTarget.value = null;
+  try {
+    await media.deleteAsset(deleteTarget.value.id);
+    deleteTarget.value = null;
+  } catch {
+    // O store publica o erro no alerta global.
+  }
 }
 </script>

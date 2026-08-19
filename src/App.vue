@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <LoginView v-if="!auth.isAuthenticated" @logged-in="handleLoggedIn" />
+    <router-view v-if="route.meta.public" />
 
     <template v-else>
       <v-navigation-drawer
@@ -24,11 +24,11 @@
           <v-list-item
             v-for="item in navItems"
             :key="item.value"
-            :active="activeView === item.value"
+            :active="route.name === item.value"
+            :to="item.to"
             :prepend-icon="item.icon"
             :title="item.title"
             rounded="lg"
-            @click="activeView = item.value"
           />
         </v-list>
 
@@ -55,13 +55,13 @@
           <span class="d-none d-md-inline">Secretaria de Planejamento e Meio Ambiente</span>
         </v-toolbar-title>
         <v-spacer />
-        <v-btn icon="mdi-refresh" variant="text" :loading="media.loading" @click="media.loadAll" />
+        <v-btn icon="mdi-refresh" title="Atualizar dados" variant="text" :loading="media.loading" @click="media.loadAll" />
         <v-avatar color="primary" size="34">
           <v-icon icon="mdi-account-outline" />
         </v-avatar>
         <div class="user-meta d-none d-sm-block">
-          <strong>Analista GeoMídia</strong>
-          <span>{{ auth.userEmail }}</span>
+          <strong>{{ roleLabel }}</strong>
+          <span>{{ auth.userName }}</span>
         </div>
       </v-app-bar>
 
@@ -79,12 +79,9 @@
             {{ media.error }}
           </v-alert>
 
-          <DashboardView v-if="activeView === 'dashboard'" @navigate="activeView = $event" />
-          <MapView v-else-if="activeView === 'map'" />
-          <InventoryView
-            v-else
-            @view-map="handleViewOnMap"
-          />
+          <router-view v-slot="{ Component }">
+            <component :is="Component" @navigate="navigate" @view-map="handleViewOnMap" />
+          </router-view>
         </v-container>
       </v-main>
 
@@ -105,53 +102,65 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 
-import DashboardView from './views/DashboardView.vue';
-import InventoryView from './views/InventoryView.vue';
-import LoginView from './views/LoginView.vue';
-import MapView from './views/MapView.vue';
 import { useAuthStore } from './stores/auth';
 import { useMediaStore } from './stores/media';
 
-type ActiveView = 'dashboard' | 'map' | 'inventory';
-
 const auth = useAuthStore();
 const media = useMediaStore();
+const route = useRoute();
+const router = useRouter();
 const display = useDisplay();
 const drawer = ref(true);
 const confirmLogout = ref(false);
-const activeView = ref<ActiveView>((localStorage.getItem('geomidia_active_view') as ActiveView) ?? 'dashboard');
 
-const navItems = [
-  { title: 'Dashboard', value: 'dashboard' as const, icon: 'mdi-view-dashboard-outline' },
-  { title: 'Mapa GIS', value: 'map' as const, icon: 'mdi-map-outline' },
-  { title: 'Inventário', value: 'inventory' as const, icon: 'mdi-folder-table-outline' },
-];
+const navItems = computed(() => [
+  { title: 'Dashboard', value: 'dashboard', to: '/', icon: 'mdi-view-dashboard-outline' },
+  { title: 'Mapa GIS', value: 'map', to: '/mapa', icon: 'mdi-map-outline' },
+  { title: 'Inventário', value: 'inventory', to: '/inventario', icon: 'mdi-folder-table-outline' },
+  ...(auth.canWrite
+    ? [{ title: 'Formulário', value: 'forms', to: '/formularios', icon: 'mdi-form-select' }]
+    : []),
+  ...(auth.role === 'admin'
+    ? [
+      { title: 'Usuários', value: 'users', to: '/usuarios', icon: 'mdi-account-cog-outline' },
+      { title: 'Regras de Negócio', value: 'rules', to: '/regras', icon: 'mdi-tune-variant' },
+    ]
+    : []),
+]);
 
-watch(activeView, (value) => {
-  localStorage.setItem('geomidia_active_view', value);
-});
+const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista GeoMídia', viewer: 'Consulta' }[auth.role ?? 'viewer']));
 
-onMounted(() => {
-  if (auth.isAuthenticated) {
-    void media.loadAll();
+onMounted(async () => {
+  window.addEventListener('geomidia:unauthorized', handleUnauthorized);
+  if (!route.meta.public && await auth.validateSession()) {
+    await media.loadAll().catch(() => undefined);
   }
 });
 
-async function handleLoggedIn() {
-  await media.loadAll();
-  activeView.value = 'dashboard';
+onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
+
+function navigate(view: 'dashboard' | 'map' | 'inventory' | 'forms' | 'users' | 'rules') {
+  void router.push({ name: view });
 }
 
 function handleViewOnMap(id: string) {
   media.selectAsset(id);
-  activeView.value = 'map';
+  void router.push({ name: 'map', query: { asset: id } });
+}
+
+function handleUnauthorized() {
+  auth.logout();
+  void router.push({ name: 'login' });
 }
 
 function logout() {
   confirmLogout.value = false;
   auth.logout();
+  media.$reset();
+  void router.push({ name: 'login' });
 }
 </script>
