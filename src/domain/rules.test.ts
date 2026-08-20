@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { MEDIA_TYPE_OPTIONS, getRequiredRadius, mediaTypeLabel, mediaTypeOptionsFromRules } from './rules';
+import {
+  DECISION_STATUS_OPTIONS,
+  MEDIA_TYPE_OPTIONS,
+  STATUS_OPTIONS,
+  getRequiredRadius,
+  mediaTypeLabel,
+  mediaTypeOptionsFromRules,
+  statusLabel,
+} from './rules';
 import type { MediaRule } from '../types';
 
 describe('regras territoriais apresentadas no frontend', () => {
@@ -36,5 +44,11 @@ describe('regras territoriais apresentadas no frontend', () => {
     expect(mediaTypeOptionsFromRules(rules)).toEqual(
       MEDIA_TYPE_OPTIONS.filter((option) => option.value !== 'empena'),
     );
+  });
+
+  it('apresenta Novos Processos apenas como status inicial', () => {
+    expect(STATUS_OPTIONS[0]).toEqual({ title: 'Novos Processos', value: 'novos processos' });
+    expect(DECISION_STATUS_OPTIONS.some((option) => option.value === 'novos processos')).toBe(false);
+    expect(statusLabel('novos processos')).toBe('Novos Processos');
   });
 });

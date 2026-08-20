@@ -88,6 +88,16 @@
                     @click="$emit('view-map', asset.id)"
                   />
                   <v-btn
+                    v-if="auth.canWrite && asset.status === 'novos processos'"
+                    icon="mdi-play-circle-outline"
+                    size="small"
+                    color="info"
+                    variant="tonal"
+                    title="Iniciar análise"
+                    :loading="media.saving"
+                    @click="startAnalysis(asset)"
+                  />
+                  <v-btn
                     v-if="auth.canDelete"
                     icon="mdi-pencil-outline"
                     size="small"
@@ -189,9 +199,18 @@
               label="E-mail do solicitante"
               type="email"
             />
+            <v-text-field
+              v-if="!editingId || form.status === 'novos processos'"
+              model-value="Novos Processos"
+              label="Status"
+              hint="Use a ação Iniciar análise para liberar as demais situações."
+              persistent-hint
+              readonly
+            />
             <v-select
+              v-else
               v-model="form.status"
-              :items="STATUS_OPTIONS"
+              :items="DECISION_STATUS_OPTIONS"
               label="Status"
             />
             <v-textarea
@@ -273,6 +292,7 @@
 import { computed, reactive, ref } from 'vue';
 
 import {
+  DECISION_STATUS_OPTIONS,
   DISTRICT_OPTIONS,
   MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
@@ -359,7 +379,7 @@ function blankForm(): MediaAssetInput {
     width_m: 9,
     bottom_height_m: 5,
     top_height_m: null,
-    status: 'análise',
+    status: 'novos processos',
     justification: '',
     attachment_links: '',
     contact_name: '',
@@ -436,6 +456,14 @@ async function save() {
       await media.createAsset(sanitizeForm());
     }
     dialog.value = false;
+  } catch {
+    // O store publica o erro no alerta global.
+  }
+}
+
+async function startAnalysis(asset: MediaAsset) {
+  try {
+    await media.startAnalysis(asset.id);
   } catch {
     // O store publica o erro no alerta global.
   }

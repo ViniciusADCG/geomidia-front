@@ -105,9 +105,9 @@ const kpis = computed(() => [
     className: 'blue',
   },
   {
-    label: 'Em Análise',
+    label: 'Em Tramitação',
     value: media.stats.pending,
-    caption: 'Aguardando decisão',
+    caption: 'Novos e em análise',
     icon: 'mdi-file-search-outline',
     color: 'warning',
     className: 'amber',

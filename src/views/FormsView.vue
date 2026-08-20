@@ -45,13 +45,14 @@
               <th>Inscrição municipal</th>
               <th>Local</th>
               <th>Tipo de veículo</th>
+              <th>Status</th>
               <th>Atualização</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="filteredForms.length === 0">
-              <td colspan="7">
+              <td colspan="8">
                 <div class="empty-table">
                   <v-icon icon="mdi-file-document-outline" size="42" />
                   <span>Nenhum formulário encontrado.</span>
@@ -64,6 +65,11 @@
               <td class="mono">{{ item.municipal_registration }}</td>
               <td>{{ item.street }}, {{ item.number }} · {{ item.district }}</td>
               <td>{{ mediaTypeLabel(item.media_type) }}</td>
+              <td>
+                <v-chip :color="statusColor(item.status)" size="small" variant="tonal">
+                  {{ statusLabel(item.status) }}
+                </v-chip>
+              </td>
               <td>{{ formatDateTime(item.updated_at) }}</td>
               <td>
                 <div class="row-actions">
@@ -80,6 +86,16 @@
                     variant="tonal"
                     title="Editar formulário"
                     @click="openEdit(item)"
+                  />
+                  <v-btn
+                    v-if="item.status === 'novos processos'"
+                    icon="mdi-play-circle-outline"
+                    size="small"
+                    color="info"
+                    variant="tonal"
+                    title="Iniciar análise"
+                    :loading="saving"
+                    @click="startAnalysis(item)"
                   />
                   <v-btn
                     v-if="auth.canDelete"
@@ -269,6 +285,8 @@ import {
   getRequiredRadius,
   mediaTypeLabel,
   mediaTypeOptionsFromRules,
+  statusColor,
+  statusLabel,
 } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
 import { useMediaStore } from '../stores/media';
@@ -464,6 +482,19 @@ async function confirmDelete() {
     showMessage('Formulário e ponto removidos do sistema.', 'success');
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir o formulário.', 'error');
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function startAnalysis(item: ApplicationForm) {
+  saving.value = true;
+  try {
+    await media.startAnalysis(item.asset_id);
+    await loadForms();
+    showMessage(`Análise do processo ${item.process_code} iniciada.`, 'success');
+  } catch (caught) {
+    showMessage(caught instanceof Error ? caught.message : 'Falha ao iniciar a análise.', 'error');
   } finally {
     saving.value = false;
   }

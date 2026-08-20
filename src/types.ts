@@ -8,6 +8,7 @@ export type MediaType =
   | 'empena de led';
 
 export type MediaStatus =
+  | 'novos processos'
   | 'aprovado'
   | 'irregular'
   | 'análise'
@@ -91,6 +92,7 @@ export interface ApplicationForm {
   id: string;
   asset_id: string;
   process_code: string;
+  status: MediaStatus;
   company_responsible: string;
   municipal_registration: string;
   property_registration: string;
@@ -111,7 +113,7 @@ export interface ApplicationForm {
 
 export type ApplicationFormInput = Omit<
   ApplicationForm,
-  'id' | 'asset_id' | 'process_code' | 'created_at' | 'updated_at'
+  'id' | 'asset_id' | 'process_code' | 'status' | 'created_at' | 'updated_at'
 >;
 
 export interface ActivityLog {

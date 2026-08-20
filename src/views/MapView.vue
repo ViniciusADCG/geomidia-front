@@ -71,6 +71,15 @@
           </div>
 
           <v-alert
+            v-if="selectedAsset.status === 'novos processos'"
+            type="info"
+            variant="tonal"
+            class="my-4"
+          >
+            Este processo é novo. Inicie a análise para calcular conflitos e liberar as demais situações.
+          </v-alert>
+          <v-alert
+            v-else
             :type="analysis?.has_conflict ? 'error' : 'success'"
             variant="tonal"
             class="my-4"
@@ -78,7 +87,7 @@
             {{ media.analyzing ? 'Analisando viabilidade territorial...' : (analysis?.message ?? 'Análise indisponível.') }}
           </v-alert>
 
-          <v-list v-if="analysis?.conflicts.length" density="compact" class="mb-3">
+          <v-list v-if="selectedAsset.status !== 'novos processos' && analysis?.conflicts.length" density="compact" class="mb-3">
             <v-list-item
               v-for="conflict in analysis.conflicts"
               :key="conflict.conflicting_asset_id"
@@ -125,62 +134,73 @@
 
           <v-divider class="my-4" />
 
-          <v-select v-if="auth.canWrite" v-model="reviewStatus" :items="STATUS_OPTIONS" label="Decisão" />
-          <v-textarea
-            v-if="auth.canWrite"
-            v-model="reviewJustification"
-            label="Justificativa"
-            rows="3"
-          />
-          <div v-if="auth.canWrite" class="attachment-crud mt-2">
-            <div class="attachment-crud-header">
-              <strong>Links de anexos</strong>
-              <span>Fotos, PDFs e arquivos relacionados</span>
-            </div>
-            <div class="attachment-crud-row">
-              <v-text-field
-                v-model="reviewAttachmentLinkDraft"
-                label="Adicionar link"
-                placeholder="https://..."
-                hide-details
-                @keydown.enter.prevent="addReviewAttachmentLink"
-              />
-              <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addReviewAttachmentLink">
-                Adicionar
-              </v-btn>
-            </div>
-            <div v-if="reviewAttachmentLinks.length" class="attachment-link-list">
-              <div
-                v-for="(link, index) in reviewAttachmentLinks"
-                :key="`${link}-${index}`"
-                class="attachment-link-item"
-              >
-                <v-btn
-                  :href="link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="text"
-                  density="comfortable"
-                  prepend-icon="mdi-open-in-new"
-                  class="attachment-link-button"
-                >
-                  {{ link }}
-                </v-btn>
-                <v-btn
-                  icon="mdi-close"
-                  size="small"
-                  variant="text"
-                  color="error"
-                  title="Remover link"
-                  @click="removeReviewAttachmentLink(index)"
-                />
-              </div>
-            </div>
-            <div v-else class="attachment-link-empty">Nenhum link adicionado ainda.</div>
-          </div>
-          <v-btn v-if="auth.canWrite" color="primary" block :loading="media.saving" :disabled="media.analyzing" @click="saveDecision">
-            Salvar Decisão
+          <v-btn
+            v-if="auth.canWrite && selectedAsset.status === 'novos processos'"
+            color="info"
+            prepend-icon="mdi-play-circle-outline"
+            block
+            :loading="media.saving"
+            @click="startSelectedAnalysis"
+          >
+            Iniciar Análise
           </v-btn>
+          <template v-else-if="auth.canWrite">
+            <v-select v-model="reviewStatus" :items="DECISION_STATUS_OPTIONS" label="Decisão" />
+            <v-textarea
+              v-model="reviewJustification"
+              label="Justificativa"
+              rows="3"
+            />
+            <div class="attachment-crud mt-2">
+              <div class="attachment-crud-header">
+                <strong>Links de anexos</strong>
+                <span>Fotos, PDFs e arquivos relacionados</span>
+              </div>
+              <div class="attachment-crud-row">
+                <v-text-field
+                  v-model="reviewAttachmentLinkDraft"
+                  label="Adicionar link"
+                  placeholder="https://..."
+                  hide-details
+                  @keydown.enter.prevent="addReviewAttachmentLink"
+                />
+                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addReviewAttachmentLink">
+                  Adicionar
+                </v-btn>
+              </div>
+              <div v-if="reviewAttachmentLinks.length" class="attachment-link-list">
+                <div
+                  v-for="(link, index) in reviewAttachmentLinks"
+                  :key="`${link}-${index}`"
+                  class="attachment-link-item"
+                >
+                  <v-btn
+                    :href="link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="text"
+                    density="comfortable"
+                    prepend-icon="mdi-open-in-new"
+                    class="attachment-link-button"
+                  >
+                    {{ link }}
+                  </v-btn>
+                  <v-btn
+                    icon="mdi-close"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    title="Remover link"
+                    @click="removeReviewAttachmentLink(index)"
+                  />
+                </div>
+              </div>
+              <div v-else class="attachment-link-empty">Nenhum link adicionado ainda.</div>
+            </div>
+            <v-btn color="primary" block :loading="media.saving" :disabled="media.analyzing" @click="saveDecision">
+              Salvar Decisão
+            </v-btn>
+          </template>
           <v-btn
             v-if="auth.canDelete"
             color="error"
@@ -218,6 +238,7 @@ import L from 'leaflet';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
 import {
+  DECISION_STATUS_OPTIONS,
   DISTRICT_OPTIONS,
   MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
@@ -290,7 +311,7 @@ watch(() => media.selectedAssetId, renderAssets);
 watch(selectedAsset, (asset) => {
   if (!asset) return;
   mode.value = 'analysis';
-  reviewStatus.value = asset.status;
+  reviewStatus.value = asset.status === 'novos processos' ? 'análise' : asset.status;
   reviewJustification.value = asset.justification ?? '';
   resetReviewAttachmentLinks(asset.attachment_links);
   focusAsset(asset);
@@ -398,7 +419,7 @@ function blankDraft(): MediaAssetInput {
     width_m: 9,
     bottom_height_m: 5,
     top_height_m: null,
-    status: 'análise',
+    status: 'novos processos',
     justification: '',
     attachment_links: '',
     contact_name: '',
@@ -505,7 +526,7 @@ async function saveDraft() {
 }
 
 async function saveDecision() {
-  if (!selectedAsset.value) return;
+  if (!selectedAsset.value || selectedAsset.value.status === 'novos processos') return;
   try {
     await media.updateAsset(selectedAsset.value.id, {
       status: reviewStatus.value,
@@ -514,6 +535,15 @@ async function saveDecision() {
     });
   } catch {
     // O store publica conflitos e erros no alerta global.
+  }
+}
+
+async function startSelectedAnalysis() {
+  if (!selectedAsset.value || selectedAsset.value.status !== 'novos processos') return;
+  try {
+    await media.startAnalysis(selectedAsset.value.id);
+  } catch {
+    // O store publica o erro no alerta global.
   }
 }
 

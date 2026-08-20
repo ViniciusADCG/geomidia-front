@@ -28,6 +28,7 @@ export function mediaTypeOptionsFromRules(rules: MediaRule[]): Array<{ title: st
 }
 
 export const STATUS_OPTIONS: Array<{ title: string; value: MediaStatus }> = [
+  { title: 'Novos Processos', value: 'novos processos' },
   { title: 'Aprovado', value: 'aprovado' },
   { title: 'Irregular', value: 'irregular' },
   { title: 'Análise', value: 'análise' },
@@ -37,6 +38,8 @@ export const STATUS_OPTIONS: Array<{ title: string; value: MediaStatus }> = [
   { title: 'Jurídico', value: 'jurídico' },
   { title: 'Vistoria', value: 'vistoria' },
 ];
+
+export const DECISION_STATUS_OPTIONS = STATUS_OPTIONS.filter((option) => option.value !== 'novos processos');
 
 export const DISTRICT_OPTIONS = [
   'Água Limpa Park',
@@ -466,6 +469,7 @@ export function mediaTypeColor(mediaType: MediaType): string {
 }
 
 export function statusColor(status: MediaStatus): string {
+  if (status === 'novos processos') return 'info';
   if (status === 'aprovado') return 'success';
   if (status === 'irregular' || status === 'vencido') return 'error';
   if (status === 'cartografia' || status === 'jurídico') return 'primary';

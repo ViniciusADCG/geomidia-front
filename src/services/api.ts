@@ -115,6 +115,9 @@ export const api = {
   analyzeMediaAsset(id: string) {
     return request<ConflictAnalysis>(`/media-assets/${id}/analysis`);
   },
+  startMediaAssetAnalysis(id: string) {
+    return request<MediaAsset>(`/media-assets/${id}/start-analysis`, { method: 'POST' });
+  },
   listActivities(limit = 30, offset = 0) {
     return request<Page<ActivityLog>>(`/activities${queryString({ limit, offset })}`);
   },

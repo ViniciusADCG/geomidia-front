@@ -92,10 +92,27 @@ export const useMediaStore = defineStore('media', {
         const index = this.assets.findIndex((asset) => asset.id === id);
         if (index >= 0) this.assets[index] = updated;
         await this.refreshMeta();
-        if (this.selectedAssetId === id) await this.analyzeAsset(id);
+        if (this.selectedAssetId === id && updated.status !== 'novos processos') await this.analyzeAsset(id);
         return updated;
       } catch (error) {
         this.error = messageFrom(error, 'Falha ao atualizar o ativo.');
+        throw error;
+      } finally {
+        this.saving = false;
+      }
+    },
+    async startAnalysis(id: string) {
+      this.saving = true;
+      this.error = null;
+      try {
+        const updated = await api.startMediaAssetAnalysis(id);
+        const index = this.assets.findIndex((asset) => asset.id === id);
+        if (index >= 0) this.assets[index] = updated;
+        await this.refreshMeta();
+        if (this.selectedAssetId === id) await this.analyzeAsset(id);
+        return updated;
+      } catch (error) {
+        this.error = messageFrom(error, 'Falha ao iniciar a análise do processo.');
         throw error;
       } finally {
         this.saving = false;
@@ -130,7 +147,13 @@ export const useMediaStore = defineStore('media', {
     },
     selectAsset(id: string | null) {
       this.selectedAssetId = id;
-      if (id) void this.analyzeAsset(id).catch(() => undefined);
+      if (!id) return;
+      const asset = this.assets.find((item) => item.id === id);
+      if (asset?.status === 'novos processos') {
+        delete this.analysisByAssetId[id];
+        return;
+      }
+      void this.analyzeAsset(id).catch(() => undefined);
     },
   },
 });
