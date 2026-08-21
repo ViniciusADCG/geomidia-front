@@ -3,6 +3,7 @@ import type {
   ApplicationForm,
   ApplicationFormInput,
   ConflictAnalysis,
+  ExpirationOverview,
   LoginResponse,
   MediaAsset,
   MediaAssetInput,
@@ -111,6 +112,9 @@ export const api = {
   },
   getMediaStats() {
     return request<MediaStats>('/media-assets/stats');
+  },
+  getMediaExpirations() {
+    return request<ExpirationOverview>('/media-assets/expirations');
   },
   analyzeMediaAsset(id: string) {
     return request<ConflictAnalysis>(`/media-assets/${id}/analysis`);

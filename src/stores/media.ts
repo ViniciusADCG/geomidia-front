@@ -3,7 +3,16 @@ import { defineStore } from 'pinia';
 import { api } from '../services/api';
 import type { ActivityLog, ConflictAnalysis, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
 
-const EMPTY_STATS: MediaStats = { total: 0, new_processes: 0, pending: 0, approved: 0, rejected: 0, by_type: {} };
+const EMPTY_STATS: MediaStats = {
+  total: 0,
+  new_processes: 0,
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+  expiring_soon: 0,
+  expired: 0,
+  by_type: {},
+};
 
 interface MediaState {
   assets: MediaAsset[];

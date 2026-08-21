@@ -16,6 +16,7 @@ export const router = createRouter({
     { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
     { path: '/mapa', name: 'map', component: () => import('../views/MapView.vue') },
     { path: '/inventario', name: 'inventory', component: () => import('../views/InventoryView.vue') },
+    { path: '/vencimentos', name: 'expirations', component: () => import('../views/ExpirationsView.vue') },
     { path: '/formularios', name: 'forms', component: () => import('../views/FormsView.vue'), meta: { write: true } },
     { path: '/usuarios', name: 'users', component: () => import('../views/UsersView.vue'), meta: { admin: true } },
     { path: '/regras', name: 'rules', component: () => import('../views/RulesView.vue'), meta: { admin: true } },

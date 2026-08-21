@@ -12,7 +12,13 @@
     </div>
 
     <div class="kpi-grid">
-      <v-card v-for="card in kpis" :key="card.label" class="kpi-card" border>
+      <v-card
+        v-for="card in kpis"
+        :key="card.label"
+        :class="['kpi-card', { 'kpi-card--clickable': card.to }]"
+        :to="card.to"
+        border
+      >
         <div>
           <span :class="['kpi-label', card.className]">{{ card.label }}</span>
           <strong>{{ card.value }}</strong>
@@ -88,7 +94,7 @@ import { useAuthStore } from '../stores/auth';
 import type { ActivityType } from '../types';
 import { formatDateTime } from '../utils/format';
 
-defineEmits<{ navigate: ['dashboard' | 'map' | 'inventory'] }>();
+defineEmits<{ navigate: ['dashboard' | 'map' | 'inventory' | 'expirations'] }>();
 
 const media = useMediaStore();
 const auth = useAuthStore();
@@ -101,6 +107,7 @@ const kpis = computed(() => [
     icon: 'mdi-folder-table-outline',
     color: 'primary',
     className: 'blue',
+    to: undefined,
   },
   {
     label: 'Novos Processos',
@@ -109,6 +116,7 @@ const kpis = computed(() => [
     icon: 'mdi-inbox-arrow-down-outline',
     color: 'info',
     className: 'cyan',
+    to: undefined,
   },
   {
     label: 'Em Análise',
@@ -117,6 +125,7 @@ const kpis = computed(() => [
     icon: 'mdi-file-search-outline',
     color: 'warning',
     className: 'amber',
+    to: undefined,
   },
   {
     label: 'Autorizados',
@@ -125,6 +134,7 @@ const kpis = computed(() => [
     icon: 'mdi-check-decagram-outline',
     color: 'success',
     className: 'green',
+    to: undefined,
   },
   {
     label: 'Irregulares',
@@ -133,6 +143,25 @@ const kpis = computed(() => [
     icon: 'mdi-alert-octagon-outline',
     color: 'error',
     className: 'red',
+    to: undefined,
+  },
+  {
+    label: 'Próximos ao Vencimento',
+    value: media.stats.expiring_soon,
+    caption: 'Vencem nos próximos 90 dias',
+    icon: 'mdi-calendar-clock-outline',
+    color: 'deep-orange',
+    className: 'orange',
+    to: '/vencimentos',
+  },
+  {
+    label: 'Vencidos',
+    value: media.stats.expired,
+    caption: 'Autorizações já vencidas',
+    icon: 'mdi-calendar-remove-outline',
+    color: 'red-darken-2',
+    className: 'burgundy',
+    to: '/vencimentos',
   },
 ]);
 

@@ -160,5 +160,14 @@ export interface MediaStats {
   pending: number;
   approved: number;
   rejected: number;
+  expiring_soon: number;
+  expired: number;
   by_type: Record<string, number>;
+}
+
+export interface ExpirationOverview {
+  reference_date: string;
+  window_end_date: string;
+  expiring_soon: MediaAsset[];
+  expired: MediaAsset[];
 }

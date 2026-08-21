@@ -121,6 +121,7 @@ const navItems = computed(() => [
   { title: 'Dashboard', value: 'dashboard', to: '/', icon: 'mdi-view-dashboard-outline' },
   { title: 'Mapa GIS', value: 'map', to: '/mapa', icon: 'mdi-map-outline' },
   { title: 'Inventário', value: 'inventory', to: '/inventario', icon: 'mdi-folder-table-outline' },
+  { title: 'Vencimentos', value: 'expirations', to: '/vencimentos', icon: 'mdi-calendar-alert-outline' },
   ...(auth.canWrite
     ? [{ title: 'Formulário', value: 'forms', to: '/formularios', icon: 'mdi-form-select' }]
     : []),
@@ -143,7 +144,7 @@ onMounted(async () => {
 
 onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
 
-function navigate(view: 'dashboard' | 'map' | 'inventory' | 'forms' | 'users' | 'rules') {
+function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'forms' | 'users' | 'rules') {
   void router.push({ name: view });
 }
 

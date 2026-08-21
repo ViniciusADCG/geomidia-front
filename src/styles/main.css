@@ -344,6 +344,16 @@ body {
   justify-content: space-between;
 }
 
+.kpi-card--clickable {
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.kpi-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(32, 42, 52, 0.12);
+}
+
 .kpi-card strong {
   display: block;
   margin-top: 8px;
@@ -367,6 +377,8 @@ body {
 .kpi-label.amber { color: #a86400; }
 .kpi-label.green { color: #237a57; }
 .kpi-label.red { color: #b42318; }
+.kpi-label.orange { color: #c2410c; }
+.kpi-label.burgundy { color: #8f1d2c; }
 
 .card-title-row {
   display: flex;

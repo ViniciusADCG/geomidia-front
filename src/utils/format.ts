@@ -12,6 +12,12 @@ export function formatDate(value: string | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
+export function calendarDayDifference(start: string, end: string): number {
+  const startTime = Date.parse(`${start.slice(0, 10)}T00:00:00Z`);
+  const endTime = Date.parse(`${end.slice(0, 10)}T00:00:00Z`);
+  return Math.round((endTime - startTime) / 86_400_000);
+}
+
 export function formatCoordinate(value: number): string {
   return value.toFixed(5);
 }
