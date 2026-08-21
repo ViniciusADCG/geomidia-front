@@ -50,13 +50,14 @@
               <th>Tipo</th>
               <th class="text-center">Raio</th>
               <th>Coordenadas</th>
+              <th>Vencimento</th>
               <th>Status</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="filteredAssets.length === 0">
-              <td colspan="8">
+              <td colspan="9">
                 <div class="empty-table">
                   <v-icon icon="mdi-database-search-outline" size="42" />
                   <span>Nenhum ativo encontrado.</span>
@@ -72,6 +73,7 @@
               <td class="mono muted">
                 {{ formatCoordinate(asset.latitude) }}, {{ formatCoordinate(asset.longitude) }}
               </td>
+              <td class="mono">{{ formatDate(asset.expiration_date) }}</td>
               <td>
                 <v-chip :color="statusColor(asset.status)" size="small" variant="tonal">
                   {{ statusLabel(asset.status) }}
@@ -191,6 +193,13 @@
               type="number"
             />
             <v-text-field
+              v-model="form.expiration_date"
+              label="Vencimento da autorização"
+              type="date"
+              hint="Opcional"
+              persistent-hint
+            />
+            <v-text-field
               v-model="form.contact_name"
               label="Contato do solicitante"
             />
@@ -305,7 +314,7 @@ import {
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
 import type { MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
-import { formatCoordinate } from '../utils/format';
+import { formatCoordinate, formatDate } from '../utils/format';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 
 defineEmits<{ 'view-map': [id: string] }>();
@@ -379,6 +388,7 @@ function blankForm(): MediaAssetInput {
     width_m: 9,
     bottom_height_m: 5,
     top_height_m: null,
+    expiration_date: null,
     status: 'novos processos',
     justification: '',
     attachment_links: '',
@@ -410,6 +420,7 @@ function sanitizeForm(): MediaAssetInput {
     ...form,
     width_m: form.width_m || null,
     top_height_m: form.top_height_m || null,
+    expiration_date: form.expiration_date || null,
     justification: form.justification || null,
     attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
     contact_name: form.contact_name || null,
@@ -436,6 +447,7 @@ function openEditDialog(asset: MediaAsset) {
     width_m: asset.width_m ?? null,
     bottom_height_m: asset.bottom_height_m,
     top_height_m: asset.top_height_m ?? null,
+    expiration_date: asset.expiration_date ?? null,
     status: asset.status,
     justification: asset.justification ?? '',
     attachment_links: asset.attachment_links ?? '',

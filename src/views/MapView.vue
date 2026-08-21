@@ -48,6 +48,13 @@
             <v-text-field v-model.number="draft.area_m2" label="Área (m²)" type="number" min="0.01" :rules="[positive]" />
             <v-text-field v-model.number="draft.bottom_height_m" label="Altura (m)" type="number" min="0" :rules="[nonNegative]" />
           </div>
+          <v-text-field
+            v-model="draft.expiration_date"
+            label="Vencimento da autorização"
+            type="date"
+            hint="Opcional"
+            persistent-hint
+          />
           <v-alert color="primary" variant="tonal" density="compact">
             Raio calculado: {{ getRequiredRadius(draft.media_type, draft.area_m2, media.rules) }}m
           </v-alert>
@@ -121,6 +128,10 @@
             <div>
               <span>Coordenadas</span>
               <strong>{{ selectedAsset.latitude.toFixed(4) }}, {{ selectedAsset.longitude.toFixed(4) }}</strong>
+            </div>
+            <div v-if="selectedAsset.expiration_date">
+              <span>Vencimento</span>
+              <strong>{{ formatDate(selectedAsset.expiration_date) }}</strong>
             </div>
             <div v-if="selectedAsset.contact_name">
               <span>Contato</span>
@@ -253,6 +264,7 @@ import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
 import type { MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
+import { formatDate } from '../utils/format';
 
 const CAMPO_GRANDE_CENTER: [number, number] = [-20.464, -54.612];
 const PUBLIC_PROPERTIES_URL = `${import.meta.env.BASE_URL}mapas/imoveis-publicos.geojson`;
@@ -419,6 +431,7 @@ function blankDraft(): MediaAssetInput {
     width_m: 9,
     bottom_height_m: 5,
     top_height_m: null,
+    expiration_date: null,
     status: 'novos processos',
     justification: '',
     attachment_links: '',
@@ -513,6 +526,7 @@ async function saveDraft() {
       ...draft,
       width_m: draft.width_m || null,
       top_height_m: draft.top_height_m || null,
+      expiration_date: draft.expiration_date || null,
       justification: draft.justification || null,
       attachment_links: null,
       contact_name: draft.contact_name || null,

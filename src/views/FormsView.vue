@@ -45,6 +45,7 @@
               <th>Inscrição municipal</th>
               <th>Local</th>
               <th>Tipo de veículo</th>
+              <th>Vencimento</th>
               <th>Status</th>
               <th>Atualização</th>
               <th class="text-center">Ações</th>
@@ -52,7 +53,7 @@
           </thead>
           <tbody>
             <tr v-if="filteredForms.length === 0">
-              <td colspan="8">
+              <td colspan="9">
                 <div class="empty-table">
                   <v-icon icon="mdi-file-document-outline" size="42" />
                   <span>Nenhum formulário encontrado.</span>
@@ -65,6 +66,7 @@
               <td class="mono">{{ item.municipal_registration }}</td>
               <td>{{ item.street }}, {{ item.number }} · {{ item.district }}</td>
               <td>{{ mediaTypeLabel(item.media_type) }}</td>
+              <td class="mono">{{ formatDate(item.expiration_date) }}</td>
               <td>
                 <v-chip :color="statusColor(item.status)" size="small" variant="tonal">
                   {{ statusLabel(item.status) }}
@@ -200,6 +202,13 @@
               min="0"
               :rules="[nonNegative]"
             />
+            <v-text-field
+              v-model="form.expiration_date"
+              label="Vencimento da autorização"
+              type="date"
+              hint="Opcional"
+              persistent-hint
+            />
             <v-alert color="primary" variant="tonal" density="compact" class="span-2">
               Raio calculado para o ponto: {{ calculatedRadius }}m
             </v-alert>
@@ -292,7 +301,7 @@ import { useAuthStore } from '../stores/auth';
 import { useMediaStore } from '../stores/media';
 import type { ApplicationForm, ApplicationFormInput, MediaType } from '../types';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
-import { formatDateTime } from '../utils/format';
+import { formatDate, formatDateTime } from '../utils/format';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -353,6 +362,7 @@ function blankForm(): ApplicationFormInput {
     media_type: 'outdoor',
     area_m2: 1,
     bottom_height_m: 0,
+    expiration_date: null,
     requester_email: '',
     attachment_links: '',
   };
@@ -390,6 +400,7 @@ function openEdit(item: ApplicationForm) {
     media_type: item.media_type,
     area_m2: item.area_m2,
     bottom_height_m: item.bottom_height_m,
+    expiration_date: item.expiration_date ?? null,
     requester_email: item.requester_email,
     attachment_links: item.attachment_links ?? '',
   });
@@ -446,6 +457,7 @@ function sanitizeForm(): ApplicationFormInput {
     requester_email: form.requester_email.trim(),
     area_m2: Number(form.area_m2),
     bottom_height_m: Number(form.bottom_height_m),
+    expiration_date: form.expiration_date || null,
     latitude: Number(form.latitude),
     longitude: Number(form.longitude),
     attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
@@ -570,6 +582,7 @@ function normalizeImportedRecord(source: Record<string, unknown>): Partial<Appli
   const mediaType = resolveMediaType(rawMediaType);
   const rawLinks = value('attachment_links', 'links_dos_anexos', 'links_anexos', 'anexos');
   const links = Array.isArray(rawLinks) ? rawLinks.join('\n') : String(rawLinks ?? '');
+  const expirationDate = normalizeImportedDate(value('expiration_date', 'vencimento', 'data_de_vencimento'));
 
   return {
     company_responsible: String(value('company_responsible', 'empresa_responsavel', 'empresa') ?? ''),
@@ -584,9 +597,18 @@ function normalizeImportedRecord(source: Record<string, unknown>): Partial<Appli
     media_type: mediaType,
     area_m2: Number(value('area_m2', 'area', 'area_do_veiculo') ?? 1),
     bottom_height_m: Number(value('bottom_height_m', 'altura', 'altura_da_borda_inferior') ?? 0),
+    expiration_date: expirationDate,
     requester_email: String(value('requester_email', 'email_do_requerente', 'email') ?? ''),
     attachment_links: links,
   };
+}
+
+function normalizeImportedDate(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const brazilianDate = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  if (brazilianDate) return `${brazilianDate[3]}-${brazilianDate[2]}-${brazilianDate[1]}`;
+  return raw.slice(0, 10);
 }
 
 function resolveMediaType(value: string): MediaType {

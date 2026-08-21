@@ -76,6 +76,7 @@ export interface MediaAsset {
   width_m?: number | null;
   bottom_height_m: number;
   top_height_m?: number | null;
+  expiration_date?: string | null;
   radius_meters: number;
   status: MediaStatus;
   justification?: string | null;
@@ -105,6 +106,7 @@ export interface ApplicationForm {
   media_type: MediaType;
   area_m2: number;
   bottom_height_m: number;
+  expiration_date?: string | null;
   requester_email: string;
   attachment_links?: string | null;
   created_at: string;
