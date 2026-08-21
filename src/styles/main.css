@@ -330,6 +330,12 @@ body {
   flex-wrap: wrap;
 }
 
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
 .kpi-card {
   min-height: 128px;
   padding: 20px;
@@ -357,6 +363,7 @@ body {
 }
 
 .kpi-label.blue { color: #0b63a0; }
+.kpi-label.cyan { color: #087e8b; }
 .kpi-label.amber { color: #a86400; }
 .kpi-label.green { color: #237a57; }
 .kpi-label.red { color: #b42318; }

@@ -11,18 +11,16 @@
       </div>
     </div>
 
-    <v-row>
-      <v-col v-for="card in kpis" :key="card.label" cols="12" sm="6" lg="3">
-        <v-card class="kpi-card" border>
-          <div>
-            <span :class="['kpi-label', card.className]">{{ card.label }}</span>
-            <strong>{{ card.value }}</strong>
-            <small>{{ card.caption }}</small>
-          </div>
-          <v-icon :icon="card.icon" size="34" :color="card.color" />
-        </v-card>
-      </v-col>
-    </v-row>
+    <div class="kpi-grid">
+      <v-card v-for="card in kpis" :key="card.label" class="kpi-card" border>
+        <div>
+          <span :class="['kpi-label', card.className]">{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+          <small>{{ card.caption }}</small>
+        </div>
+        <v-icon :icon="card.icon" size="34" :color="card.color" />
+      </v-card>
+    </div>
 
     <v-row>
       <v-col cols="12">
@@ -105,9 +103,17 @@ const kpis = computed(() => [
     className: 'blue',
   },
   {
-    label: 'Em Tramitação',
+    label: 'Novos Processos',
+    value: media.stats.new_processes,
+    caption: 'Aguardando início da análise',
+    icon: 'mdi-inbox-arrow-down-outline',
+    color: 'info',
+    className: 'cyan',
+  },
+  {
+    label: 'Em Análise',
     value: media.stats.pending,
-    caption: 'Novos e em análise',
+    caption: 'Processos em análise técnica',
     icon: 'mdi-file-search-outline',
     color: 'warning',
     className: 'amber',

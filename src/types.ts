@@ -154,6 +154,7 @@ export interface Page<T> {
 
 export interface MediaStats {
   total: number;
+  new_processes: number;
   pending: number;
   approved: number;
   rejected: number;
