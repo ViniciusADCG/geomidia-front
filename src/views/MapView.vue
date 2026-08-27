@@ -8,6 +8,13 @@
         </div>
         <div class="map-filters">
           <v-select
+            v-model="companyFilter"
+            :items="companyFilterOptions"
+            label="Filtrar empresa"
+            hide-details
+            class="map-filter map-filter--company"
+          />
+          <v-select
             v-model="typeFilter"
             :items="typeFilterOptions"
             label="Filtrar tipo"
@@ -141,6 +148,13 @@
               <span>E-mail</span>
               <strong>{{ selectedAsset.contact_email }}</strong>
             </div>
+            <div v-if="selectedAsset.company_responsible">
+              <span>Empresa</span>
+              <strong>
+                {{ selectedAsset.company_responsible }}
+                <template v-if="selectedAsset.company_cnpj"> - CNPJ {{ formatCompanyCnpj(selectedAsset.company_cnpj) }}</template>
+              </strong>
+            </div>
           </div>
 
           <v-divider class="my-4" />
@@ -273,6 +287,7 @@ const PUBLIC_PROPERTIES_COLOR = '#f57c00';
 const media = useMediaStore();
 const auth = useAuthStore();
 const mapElement = ref<HTMLElement | null>(null);
+const companyFilter = ref('all');
 const typeFilter = ref<MediaType | 'all'>('all');
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
@@ -293,6 +308,27 @@ let publicPropertiesLayer: L.GeoJSON | null = null;
 let publicPropertiesRenderer: L.Canvas | null = null;
 let publicPropertiesRequest: AbortController | null = null;
 
+const companyFilterOptions = computed(() => {
+  const companies = new Map<string, { title: string; value: string }>();
+
+  media.assets.forEach((asset) => {
+    const name = asset.company_responsible?.trim();
+    if (!name) return;
+
+    const key = companyKey(name, asset.company_cnpj);
+    const cnpjLabel = formatCompanyCnpj(asset.company_cnpj);
+    companies.set(key, {
+      title: `${name} - CNPJ ${cnpjLabel}`,
+      value: key,
+    });
+  });
+
+  return [
+    { title: 'Todas as empresas', value: 'all' },
+    ...Array.from(companies.values()).sort((first, second) => first.title.localeCompare(second.title, 'pt-BR')),
+  ];
+});
+
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
   ...MEDIA_TYPE_OPTIONS,
@@ -306,7 +342,8 @@ const statusFilterOptions = computed(() => [
 ]);
 
 const filteredAssets = computed(() => media.assets.filter((asset) => (
-  (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
+  (companyFilter.value === 'all' || companyKey(asset.company_responsible, asset.company_cnpj) === companyFilter.value)
+  && (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
   && (statusFilter.value === 'all' || asset.status === statusFilter.value)
 )));
 
@@ -317,6 +354,11 @@ const analysis = computed(() => (
 ));
 
 watch(filteredAssets, renderAssets, { deep: true });
+
+watch(companyFilterOptions, (options) => {
+  if (options.some((option) => option.value === companyFilter.value)) return;
+  companyFilter.value = 'all';
+});
 
 watch(() => media.selectedAssetId, renderAssets);
 
@@ -438,6 +480,21 @@ function blankDraft(): MediaAssetInput {
     contact_name: '',
     contact_email: '',
   };
+}
+
+function companyKey(name: string | null | undefined, cnpj: string | null | undefined): string {
+  return `${normalizeCompanyValue(name)}::${normalizeCompanyValue(cnpj)}`;
+}
+
+function normalizeCompanyValue(value: string | null | undefined): string {
+  return String(value ?? '').trim().toLocaleLowerCase('pt-BR');
+}
+
+function formatCompanyCnpj(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 14) return raw || 'nao informado';
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }
 
 function resetReviewAttachmentLinks(value: string | null | undefined = '') {
