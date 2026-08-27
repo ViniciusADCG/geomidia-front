@@ -161,4 +161,7 @@ export const api = {
   deleteApplicationForm(id: string) {
     return request<void>(`/application-forms/${id}`, { method: 'DELETE' });
   },
+  getApplicationFormAttachmentDownload(formId: string, attachmentId: string) {
+    return request<{ url: string }>(`/application-forms/${formId}/attachments/${attachmentId}/download`);
+  },
 };

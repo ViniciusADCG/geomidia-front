@@ -189,6 +189,12 @@
               class="span-2"
             />
             <v-text-field
+              v-model="form.number_of_faces"
+              label="Quantidade de faces"
+              hint="Opcional para cadastros internos"
+              persistent-hint
+            />
+            <v-text-field
               v-model.number="form.area_m2"
               label="Área do veículo (m²)"
               type="number"
@@ -220,6 +226,25 @@
               :rules="[required, emailRule]"
               class="span-2"
             />
+
+            <div v-if="uploadedAttachments.length" class="attachment-crud span-2">
+              <div class="attachment-crud-header">
+                <strong>Documentos enviados pelo formulário público</strong>
+                <span>Os arquivos ficam em armazenamento privado e o acesso exige login.</span>
+              </div>
+              <div class="attachment-link-list">
+                <div v-for="attachment in uploadedAttachments" :key="attachment.id" class="attachment-link-item">
+                  <v-btn
+                    variant="text"
+                    prepend-icon="mdi-download-outline"
+                    class="attachment-link-button"
+                    @click="downloadUploadedAttachment(attachment)"
+                  >
+                    {{ attachmentCategoryLabel(attachment.category) }} · {{ attachment.original_filename }}
+                  </v-btn>
+                </div>
+              </div>
+            </div>
 
             <div class="attachment-crud span-2">
               <div class="attachment-crud-header">
@@ -299,7 +324,7 @@ import {
 } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
 import { useMediaStore } from '../stores/media';
-import type { ApplicationForm, ApplicationFormInput, MediaType } from '../types';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, MediaType } from '../types';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 import { formatDate, formatDateTime } from '../utils/format';
 
@@ -320,6 +345,7 @@ const message = ref('');
 const messageType = ref<'success' | 'error' | 'info'>('success');
 const attachmentDraft = ref('');
 const attachmentLinks = ref<string[]>([]);
+const uploadedAttachments = ref<ApplicationFormAttachment[]>([]);
 const form = reactive<ApplicationFormInput>(blankForm());
 
 const required = (value: string) => Boolean(String(value ?? '').trim()) || 'Campo obrigatório.';
@@ -362,6 +388,7 @@ function blankForm(): ApplicationFormInput {
     media_type: 'outdoor',
     area_m2: 1,
     bottom_height_m: 0,
+    number_of_faces: null,
     expiration_date: null,
     requester_email: '',
     attachment_links: '',
@@ -381,6 +408,7 @@ function openCreate() {
   importedFileName.value = '';
   Object.assign(form, blankForm());
   resetAttachments('');
+  uploadedAttachments.value = [];
   dialog.value = true;
 }
 
@@ -400,11 +428,13 @@ function openEdit(item: ApplicationForm) {
     media_type: item.media_type,
     area_m2: item.area_m2,
     bottom_height_m: item.bottom_height_m,
+    number_of_faces: item.number_of_faces ?? null,
     expiration_date: item.expiration_date ?? null,
     requester_email: item.requester_email,
     attachment_links: item.attachment_links ?? '',
   });
   resetAttachments(item.attachment_links);
+  uploadedAttachments.value = item.attachments ?? [];
   dialog.value = true;
 }
 
@@ -445,6 +475,31 @@ function removeAttachment(index: number) {
   attachmentLinks.value = attachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
 }
 
+const attachmentCategoryLabels: Record<string, string> = {
+  alvaraLocalizacao: 'Alvará de localização',
+  requerimentoPadrao: 'Requerimento padrão',
+  autorizacaoProprietario: 'Autorização do proprietário',
+  documentoProprietario: 'Documento do proprietário',
+  projetoEstrutural: 'Projeto estrutural',
+  projetoImplantacao: 'Projeto de implantação',
+  artRrt: 'ART/RRT',
+};
+
+function attachmentCategoryLabel(category: string): string {
+  return attachmentCategoryLabels[category] ?? category;
+}
+
+async function downloadUploadedAttachment(attachment: ApplicationFormAttachment) {
+  if (!editingId.value) return;
+  try {
+    const { url } = await api.getApplicationFormAttachmentDownload(editingId.value, attachment.id);
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (opened) opened.opener = null;
+  } catch (caught) {
+    showMessage(caught instanceof Error ? caught.message : 'Falha ao abrir o anexo.', 'error');
+  }
+}
+
 function sanitizeForm(): ApplicationFormInput {
   return {
     ...form,
@@ -457,6 +512,7 @@ function sanitizeForm(): ApplicationFormInput {
     requester_email: form.requester_email.trim(),
     area_m2: Number(form.area_m2),
     bottom_height_m: Number(form.bottom_height_m),
+    number_of_faces: form.number_of_faces?.trim() || null,
     expiration_date: form.expiration_date || null,
     latitude: Number(form.latitude),
     longitude: Number(form.longitude),

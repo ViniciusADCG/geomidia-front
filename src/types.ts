@@ -89,6 +89,15 @@ export interface MediaAsset {
 
 export type MediaAssetInput = Omit<MediaAsset, 'id' | 'process_code' | 'radius_meters' | 'created_at' | 'updated_at'>;
 
+export interface ApplicationFormAttachment {
+  id: string;
+  category: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export interface ApplicationForm {
   id: string;
   asset_id: string;
@@ -106,16 +115,18 @@ export interface ApplicationForm {
   media_type: MediaType;
   area_m2: number;
   bottom_height_m: number;
+  number_of_faces?: string | null;
   expiration_date?: string | null;
   requester_email: string;
   attachment_links?: string | null;
+  attachments: ApplicationFormAttachment[];
   created_at: string;
   updated_at: string;
 }
 
 export type ApplicationFormInput = Omit<
   ApplicationForm,
-  'id' | 'asset_id' | 'process_code' | 'status' | 'created_at' | 'updated_at'
+  'id' | 'asset_id' | 'process_code' | 'status' | 'attachments' | 'created_at' | 'updated_at'
 >;
 
 export interface ActivityLog {
