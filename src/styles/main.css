@@ -606,11 +606,16 @@ body {
   max-width: 240px;
 }
 
+.map-filter--company {
+  max-width: 320px;
+}
+
 .map-filters {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
-  width: min(500px, 100%);
+  width: min(820px, 100%);
 }
 
 .map-filters .map-filter {

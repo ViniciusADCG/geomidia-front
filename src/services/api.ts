@@ -47,14 +47,23 @@ function errorMessage(payload: unknown): string {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = accessToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    throw new ApiError(
+      `Nao foi possivel conectar a API em ${API_BASE_URL}. Verifique se o backend esta em execucao.`,
+      0,
+      error,
+    );
+  }
 
   if (response.status === 204) return undefined as T;
   const payload = await response.json().catch(() => null);

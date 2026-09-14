@@ -79,6 +79,8 @@ export interface MediaAsset {
   expiration_date?: string | null;
   radius_meters: number;
   status: MediaStatus;
+  company_responsible?: string | null;
+  company_cnpj?: string | null;
   justification?: string | null;
   attachment_links?: string | null;
   contact_name?: string | null;
