@@ -106,6 +106,7 @@ export interface ApplicationForm {
   process_code: string;
   status: MediaStatus;
   company_responsible: string;
+  company_cnpj?: string | null;
   municipal_registration: string;
   property_registration: string;
   latitude: number;

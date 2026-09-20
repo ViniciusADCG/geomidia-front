@@ -42,6 +42,7 @@
             <tr>
               <th>Processo</th>
               <th>Empresa responsável</th>
+              <th>CNPJ</th>
               <th>Inscrição municipal</th>
               <th>Local</th>
               <th>Tipo de veículo</th>
@@ -53,7 +54,7 @@
           </thead>
           <tbody>
             <tr v-if="filteredForms.length === 0">
-              <td colspan="9">
+              <td colspan="10">
                 <div class="empty-table">
                   <v-icon icon="mdi-file-document-outline" size="42" />
                   <span>Nenhum formulário encontrado.</span>
@@ -63,6 +64,7 @@
             <tr v-for="item in filteredForms" :key="item.id">
               <td class="mono strong">{{ item.process_code }}</td>
               <td>{{ item.company_responsible }}</td>
+              <td class="mono">{{ item.company_cnpj || '—' }}</td>
               <td class="mono">{{ item.municipal_registration }}</td>
               <td>{{ item.street }}, {{ item.number }} · {{ item.district }}</td>
               <td>{{ mediaTypeLabel(item.media_type) }}</td>
@@ -139,6 +141,12 @@
               v-model="form.municipal_registration"
               label="Inscrição municipal"
               :rules="[required]"
+            />
+            <v-text-field
+              v-model="form.company_cnpj"
+              label="CNPJ"
+              placeholder="00.000.000/0000-00"
+              :rules="[optionalCnpjRule]"
             />
             <v-text-field
               v-model="form.property_registration"
@@ -353,6 +361,10 @@ const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior
 const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
 const emailRule = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'E-mail inválido.';
 const postalCodeRule = (value: string) => /^\d{5}-?\d{3}$/.test(value) || 'Informe um CEP válido.';
+const optionalCnpjRule = (value: string | null | undefined) => {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return !digits || digits.length === 14 || 'O CNPJ deve conter 14 dígitos.';
+};
 const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
   (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
 );
@@ -365,6 +377,7 @@ const filteredForms = computed(() => {
   return forms.value.filter((item) => [
     item.process_code,
     item.company_responsible,
+    item.company_cnpj ?? '',
     item.municipal_registration,
     item.property_registration,
     item.street,
@@ -377,6 +390,7 @@ onMounted(loadForms);
 function blankForm(): ApplicationFormInput {
   return {
     company_responsible: '',
+    company_cnpj: null,
     municipal_registration: '',
     property_registration: '',
     latitude: -20.464,
@@ -417,6 +431,7 @@ function openEdit(item: ApplicationForm) {
   importedFileName.value = '';
   Object.assign(form, {
     company_responsible: item.company_responsible,
+    company_cnpj: item.company_cnpj ?? null,
     municipal_registration: item.municipal_registration,
     property_registration: item.property_registration,
     latitude: item.latitude,
@@ -504,6 +519,7 @@ function sanitizeForm(): ApplicationFormInput {
   return {
     ...form,
     company_responsible: form.company_responsible.trim(),
+    company_cnpj: String(form.company_cnpj ?? '').replace(/\D/g, '') || null,
     municipal_registration: form.municipal_registration.trim(),
     property_registration: form.property_registration.trim(),
     street: form.street.trim(),
@@ -642,6 +658,7 @@ function normalizeImportedRecord(source: Record<string, unknown>): Partial<Appli
 
   return {
     company_responsible: String(value('company_responsible', 'empresa_responsavel', 'empresa') ?? ''),
+    company_cnpj: String(value('company_cnpj', 'cnpj') ?? '').replace(/\D/g, '') || null,
     municipal_registration: String(value('municipal_registration', 'inscricao_municipal') ?? ''),
     property_registration: String(value('property_registration', 'inscricao_imobiliaria') ?? ''),
     latitude: Number(value('latitude') ?? coordinates[0] ?? -20.464),
