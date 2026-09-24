@@ -658,13 +658,42 @@ body {
 .side-stack {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
-.analysis-card {
-  max-height: max(320px, calc(100dvh - 190px));
-  overflow-y: scroll;
-  overscroll-behavior-y: contain;
+.v-card.analysis-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100dvh - 190px);
+  overflow: hidden;
+}
+
+.analysis-card--selected {
+  height: calc(100dvh - 190px);
+}
+
+.analysis-card-header {
+  flex: none;
+  padding: 20px 20px 0;
+}
+
+.analysis-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 20px 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.analysis-card-empty {
+  padding: 20px;
 }
 
 .stack-form {
@@ -682,13 +711,22 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
+}
+
+.selected-header > div:first-child {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .selected-header-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .detail-section-title {
@@ -709,10 +747,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px;
   border: 1px solid #e3e9ee;
   border-radius: 8px;
+}
+
+.detail-attachment-item > div {
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .detail-attachment-item strong,
@@ -742,6 +786,7 @@ body {
 }
 
 .spec-grid div {
+  min-width: 0;
   padding: 12px;
   border: 1px solid #e3e9ee;
   border-radius: 8px;
