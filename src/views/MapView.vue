@@ -71,9 +71,9 @@
         </v-form>
       </v-card>
 
-      <v-card v-else border class="pa-5 analysis-card">
+      <v-card v-else border class="analysis-card" :class="{ 'analysis-card--selected': selectedAsset }">
         <template v-if="selectedAsset">
-          <div class="selected-header">
+          <div class="analysis-card-header selected-header">
             <div>
               <v-chip size="small" color="primary" variant="tonal">{{ selectedAsset.process_code }}</v-chip>
               <h3>{{ selectedAsset.address }}</h3>
@@ -87,6 +87,7 @@
             </div>
           </div>
 
+          <div ref="detailScrollElement" class="analysis-card-body">
           <h4 class="detail-section-title">Dados do processo</h4>
           <div class="spec-grid">
             <div><span>Protocolo</span><strong>{{ selectedAsset.process_code }}</strong></div>
@@ -305,9 +306,10 @@
           >
             Excluir Ponto
           </v-btn>
+          </div>
         </template>
 
-        <div v-else class="empty-state compact">
+        <div v-else class="empty-state compact analysis-card-empty">
           <v-icon icon="mdi-map-marker-question-outline" size="44" />
           <span>Selecione um marcador no mapa para analisar.</span>
         </div>
@@ -358,6 +360,7 @@ const media = useMediaStore();
 const auth = useAuthStore();
 const mapElement = ref<HTMLElement | null>(null);
 const sideStack = ref<HTMLElement | null>(null);
+const detailScrollElement = ref<HTMLElement | null>(null);
 const companyFilter = ref('all');
 const typeFilter = ref<MediaType | 'all'>('all');
 const statusFilter = ref<MediaStatus | 'all'>('all');
@@ -441,8 +444,7 @@ watch(companyFilterOptions, (options) => {
 watch(() => media.selectedAssetId, async () => {
   renderAssets();
   await nextTick();
-  const panel = sideStack.value?.querySelector<HTMLElement>('.analysis-card');
-  if (panel) panel.scrollTop = 0;
+  if (detailScrollElement.value) detailScrollElement.value.scrollTop = 0;
 });
 
 watch(selectedAsset, (asset) => {
@@ -458,6 +460,7 @@ onMounted(async () => {
   if (auth.canWrite) void media.loadApplicationFormsForMap(true);
   await nextTick();
   if (!mapElement.value) return;
+  if (sideStack.value) L.DomEvent.disableScrollPropagation(sideStack.value);
 
   map = L.map(mapElement.value, {
     zoomControl: true,
