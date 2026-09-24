@@ -8,6 +8,13 @@
         </div>
         <div class="map-filters">
           <v-select
+            v-model="companyFilter"
+            :items="companyFilterOptions"
+            label="Filtrar empresa"
+            hide-details
+            class="map-filter map-filter--company"
+          />
+          <v-select
             v-model="typeFilter"
             :items="typeFilterOptions"
             label="Filtrar tipo"
@@ -26,10 +33,10 @@
       <div ref="mapElement" class="leaflet-map" />
     </v-card>
 
-    <aside class="side-stack">
+    <aside ref="sideStack" class="side-stack">
       <v-btn-toggle v-model="mode" mandatory divided density="comfortable" class="w-100">
         <v-btn value="analysis" class="flex-1">Análise</v-btn>
-        <v-btn v-if="auth.canWrite" value="form" class="flex-1">Cadastro</v-btn>
+        <v-btn v-if="auth.canWrite" value="form" class="flex-1" :disabled="Boolean(selectedAsset)">Cadastro</v-btn>
       </v-btn-toggle>
 
       <v-card v-if="mode === 'form'" border class="pa-5">
@@ -72,9 +79,23 @@
               <h3>{{ selectedAsset.address }}</h3>
               <span>{{ selectedAsset.district }} · {{ mediaTypeLabel(selectedAsset.media_type) }}</span>
             </div>
-            <v-chip :color="statusColor(selectedAsset.status)" variant="tonal">
-              {{ statusLabel(selectedAsset.status) }}
-            </v-chip>
+            <div class="selected-header-actions">
+              <v-chip :color="statusColor(selectedAsset.status)" variant="tonal">
+                {{ statusLabel(selectedAsset.status) }}
+              </v-chip>
+              <v-btn icon="mdi-close" size="small" variant="text" title="Fechar detalhes" aria-label="Fechar detalhes" @click="media.selectAsset(null)" />
+            </div>
+          </div>
+
+          <h4 class="detail-section-title">Dados do processo</h4>
+          <div class="spec-grid">
+            <div><span>Protocolo</span><strong>{{ selectedAsset.process_code }}</strong></div>
+            <div><span>Status</span><strong>{{ statusLabel(selectedAsset.status) }}</strong></div>
+            <div><span>Criado em</span><strong>{{ formatDateTime(selectedAsset.created_at) }}</strong></div>
+            <div><span>Atualizado em</span><strong>{{ formatDateTime(selectedAsset.updated_at) }}</strong></div>
+            <div v-if="selectedAsset.justification" class="detail-wide">
+              <span>Justificativa / análise</span><strong>{{ selectedAsset.justification }}</strong>
+            </div>
           </div>
 
           <v-alert
@@ -104,7 +125,52 @@
             />
           </v-list>
 
+          <v-alert v-if="media.applicationFormsLoading && auth.canWrite" type="info" variant="tonal" density="compact" class="mt-4">
+            Carregando dados da solicitação e anexos...
+          </v-alert>
+          <v-alert v-if="media.applicationFormsError && auth.canWrite" type="warning" variant="tonal" density="compact" class="mt-4">
+            {{ media.applicationFormsError }}
+            <v-btn variant="text" size="small" @click="media.loadApplicationFormsForMap()">Tentar novamente</v-btn>
+          </v-alert>
+
+          <h4 v-if="selectedForm || selectedAsset.company_responsible || selectedAsset.contact_name || selectedAsset.contact_email" class="detail-section-title">Requerente / empresa</h4>
+          <div v-if="selectedForm || selectedAsset.company_responsible || selectedAsset.contact_name || selectedAsset.contact_email" class="spec-grid">
+            <div v-if="selectedForm?.company_responsible || selectedAsset.company_responsible || selectedAsset.contact_name">
+              <span>Empresa / responsável</span>
+              <strong>{{ selectedForm?.company_responsible || selectedAsset.company_responsible || selectedAsset.contact_name }}</strong>
+            </div>
+            <div v-if="selectedAsset.contact_name && selectedAsset.contact_name !== (selectedForm?.company_responsible || selectedAsset.company_responsible)">
+              <span>Contato</span><strong>{{ selectedAsset.contact_name }}</strong>
+            </div>
+            <div v-if="selectedForm?.company_cnpj || selectedAsset.company_cnpj">
+              <span>CNPJ</span><strong>{{ formatCompanyCnpj(selectedForm?.company_cnpj || selectedAsset.company_cnpj) }}</strong>
+            </div>
+            <div v-if="selectedForm?.municipal_registration">
+              <span>Inscrição municipal</span><strong>{{ selectedForm.municipal_registration }}</strong>
+            </div>
+            <div v-if="selectedForm?.requester_email || selectedAsset.contact_email">
+              <span>E-mail</span><strong>{{ selectedForm?.requester_email || selectedAsset.contact_email }}</strong>
+            </div>
+          </div>
+
+          <h4 class="detail-section-title">Local de instalação</h4>
           <div class="spec-grid">
+            <div v-if="selectedForm?.property_registration">
+              <span>Inscrição imobiliária</span><strong>{{ selectedForm.property_registration }}</strong>
+            </div>
+            <div class="detail-wide">
+              <span>Endereço</span><strong>{{ selectedForm ? `${selectedForm.street}, ${selectedForm.number}` : selectedAsset.address }}</strong>
+            </div>
+            <div><span>Bairro</span><strong>{{ selectedForm?.district || selectedAsset.district }}</strong></div>
+            <div v-if="selectedForm?.postal_code"><span>CEP</span><strong>{{ selectedForm.postal_code }}</strong></div>
+            <div><span>Latitude</span><strong>{{ selectedAsset.latitude.toFixed(6) }}</strong></div>
+            <div><span>Longitude</span><strong>{{ selectedAsset.longitude.toFixed(6) }}</strong></div>
+          </div>
+
+          <h4 class="detail-section-title">Veículo de comunicação</h4>
+          <div class="spec-grid">
+            <div><span>Tipo</span><strong>{{ mediaTypeLabel(selectedAsset.media_type) }}</strong></div>
+            <div v-if="selectedForm?.number_of_faces"><span>Quantidade de faces</span><strong>{{ selectedForm.number_of_faces }}</strong></div>
             <div>
               <span>Área</span>
               <strong>{{ selectedAsset.area_m2 }} m²</strong>
@@ -113,11 +179,11 @@
               <span>Altura</span>
               <strong>{{ selectedAsset.bottom_height_m }} m</strong>
             </div>
-            <div v-if="selectedAsset.width_m">
+            <div v-if="selectedAsset.width_m != null">
               <span>Largura</span>
               <strong>{{ selectedAsset.width_m }} m</strong>
             </div>
-            <div v-if="selectedAsset.top_height_m">
+            <div v-if="selectedAsset.top_height_m != null">
               <span>Borda superior</span>
               <strong>{{ selectedAsset.top_height_m }} m</strong>
             </div>
@@ -125,23 +191,40 @@
               <span>Raio</span>
               <strong>{{ selectedAsset.radius_meters }} m</strong>
             </div>
-            <div>
-              <span>Coordenadas</span>
-              <strong>{{ selectedAsset.latitude.toFixed(4) }}, {{ selectedAsset.longitude.toFixed(4) }}</strong>
-            </div>
             <div v-if="selectedAsset.expiration_date">
               <span>Vencimento</span>
               <strong>{{ formatDate(selectedAsset.expiration_date) }}</strong>
             </div>
-            <div v-if="selectedAsset.contact_name">
-              <span>Contato</span>
-              <strong>{{ selectedAsset.contact_name }}</strong>
-            </div>
-            <div v-if="selectedAsset.contact_email">
-              <span>E-mail</span>
-              <strong>{{ selectedAsset.contact_email }}</strong>
-            </div>
           </div>
+
+          <template v-if="formDocuments.length || formImages.length || selectedAttachmentLinks.length">
+            <h4 class="detail-section-title">Anexos / documentos</h4>
+            <div v-if="formDocuments.length" class="detail-attachment-list">
+              <div v-for="attachment in formDocuments" :key="attachment.id" class="detail-attachment-item">
+                <div>
+                  <strong>{{ attachmentCategoryLabel(attachment.category) }}</strong>
+                  <span>{{ attachment.original_filename }}</span>
+                </div>
+                <v-btn size="small" variant="tonal" prepend-icon="mdi-open-in-new" @click="openUploadedAttachment(attachment)">Visualizar / baixar</v-btn>
+              </div>
+            </div>
+            <h4 v-if="formImages.length" class="detail-section-title">Fotos / imagens</h4>
+            <div v-if="formImages.length" class="detail-attachment-list">
+              <div v-for="attachment in formImages" :key="attachment.id" class="detail-attachment-item">
+                <div>
+                  <strong>{{ attachmentCategoryLabel(attachment.category) }}</strong>
+                  <span>{{ attachment.original_filename }}</span>
+                </div>
+                <v-btn size="small" variant="tonal" prepend-icon="mdi-image-outline" @click="openUploadedAttachment(attachment)">Visualizar / baixar</v-btn>
+              </div>
+            </div>
+            <div v-if="selectedAttachmentLinks.length" class="detail-attachment-list mt-3">
+              <div v-for="(link, index) in selectedAttachmentLinks" :key="`${link}-${index}`" class="detail-attachment-item">
+                <span>Link de anexo {{ index + 1 }}</span>
+                <v-btn :href="link" target="_blank" rel="noopener noreferrer" size="small" variant="tonal" prepend-icon="mdi-open-in-new">Abrir</v-btn>
+              </div>
+            </div>
+          </template>
 
           <v-divider class="my-4" />
 
@@ -262,9 +345,10 @@ import {
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
-import type { MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
-import { formatDate } from '../utils/format';
+import { formatDate, formatDateTime } from '../utils/format';
 
 const CAMPO_GRANDE_CENTER: [number, number] = [-20.464, -54.612];
 const PUBLIC_PROPERTIES_URL = `${import.meta.env.BASE_URL}mapas/imoveis-publicos.geojson`;
@@ -273,6 +357,8 @@ const PUBLIC_PROPERTIES_COLOR = '#f57c00';
 const media = useMediaStore();
 const auth = useAuthStore();
 const mapElement = ref<HTMLElement | null>(null);
+const sideStack = ref<HTMLElement | null>(null);
+const companyFilter = ref('all');
 const typeFilter = ref<MediaType | 'all'>('all');
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
@@ -293,6 +379,27 @@ let publicPropertiesLayer: L.GeoJSON | null = null;
 let publicPropertiesRenderer: L.Canvas | null = null;
 let publicPropertiesRequest: AbortController | null = null;
 
+const companyFilterOptions = computed(() => {
+  const companies = new Map<string, { title: string; value: string }>();
+
+  media.assets.forEach((asset) => {
+    const name = asset.company_responsible?.trim();
+    if (!name) return;
+
+    const key = companyKey(name, asset.company_cnpj);
+    const cnpjLabel = formatCompanyCnpj(asset.company_cnpj);
+    companies.set(key, {
+      title: `${name} - CNPJ ${cnpjLabel}`,
+      value: key,
+    });
+  });
+
+  return [
+    { title: 'Todas as empresas', value: 'all' },
+    ...Array.from(companies.values()).sort((first, second) => first.title.localeCompare(second.title, 'pt-BR')),
+  ];
+});
+
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
   ...MEDIA_TYPE_OPTIONS,
@@ -306,11 +413,19 @@ const statusFilterOptions = computed(() => [
 ]);
 
 const filteredAssets = computed(() => media.assets.filter((asset) => (
-  (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
+  (companyFilter.value === 'all' || companyKey(asset.company_responsible, asset.company_cnpj) === companyFilter.value)
+  && (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
   && (statusFilter.value === 'all' || asset.status === statusFilter.value)
 )));
 
 const selectedAsset = computed(() => media.selectedAsset);
+const selectedForm = computed(() => media.selectedApplicationForm);
+const formImages = computed(() => selectedForm.value?.attachments.filter((item) => item.content_type.startsWith('image/')) ?? []);
+const formDocuments = computed(() => selectedForm.value?.attachments.filter((item) => !item.content_type.startsWith('image/')) ?? []);
+const selectedAttachmentLinks = computed(() => [...new Set([
+  ...parseAttachmentLinks(selectedForm.value?.attachment_links),
+  ...parseAttachmentLinks(selectedAsset.value?.attachment_links),
+])].filter((link) => /^https?:\/\//i.test(link)));
 
 const analysis = computed(() => (
   selectedAsset.value ? media.analysisByAssetId[selectedAsset.value.id] : null
@@ -318,7 +433,17 @@ const analysis = computed(() => (
 
 watch(filteredAssets, renderAssets, { deep: true });
 
-watch(() => media.selectedAssetId, renderAssets);
+watch(companyFilterOptions, (options) => {
+  if (options.some((option) => option.value === companyFilter.value)) return;
+  companyFilter.value = 'all';
+});
+
+watch(() => media.selectedAssetId, async () => {
+  renderAssets();
+  await nextTick();
+  const panel = sideStack.value?.querySelector<HTMLElement>('.analysis-card');
+  if (panel) panel.scrollTop = 0;
+});
 
 watch(selectedAsset, (asset) => {
   if (!asset) return;
@@ -330,6 +455,7 @@ watch(selectedAsset, (asset) => {
 }, { immediate: true });
 
 onMounted(async () => {
+  if (auth.canWrite) void media.loadApplicationFormsForMap(true);
   await nextTick();
   if (!mapElement.value) return;
 
@@ -440,6 +566,21 @@ function blankDraft(): MediaAssetInput {
   };
 }
 
+function companyKey(name: string | null | undefined, cnpj: string | null | undefined): string {
+  return `${normalizeCompanyValue(name)}::${normalizeCompanyValue(cnpj)}`;
+}
+
+function normalizeCompanyValue(value: string | null | undefined): string {
+  return String(value ?? '').trim().toLocaleLowerCase('pt-BR');
+}
+
+function formatCompanyCnpj(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 14) return raw || 'nao informado';
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
 function resetReviewAttachmentLinks(value: string | null | undefined = '') {
   reviewAttachmentLinks.value = parseAttachmentLinks(value);
   reviewAttachmentLinkDraft.value = '';
@@ -487,7 +628,7 @@ function renderAssets() {
       .on('click', (event) => selectMapAsset(asset.id, event))
       .addTo(assetLayer!);
 
-    radiusCircle.bindTooltip(`${asset.process_code} · clique para analisar`);
+    radiusCircle.bindTooltip(`${asset.process_code} · clique para ver detalhes`);
     pointMarker.bringToFront();
   });
 }
@@ -499,10 +640,7 @@ function selectMapAsset(assetId: string, event: L.LeafletMouseEvent) {
 }
 
 function handleMapClick(event: L.LeafletMouseEvent) {
-  if (!auth.canWrite) {
-    media.selectAsset(null);
-    return;
-  }
+  if (!auth.canWrite || (mode.value !== 'form' && selectedAsset.value)) return;
   Object.assign(draft, blankDraft(), {
     latitude: Number(event.latlng.lat.toFixed(6)),
     longitude: Number(event.latlng.lng.toFixed(6)),
@@ -517,6 +655,16 @@ function focusAsset(asset: MediaAsset) {
   renderAssets();
   if (!map) return;
   map.setView([asset.latitude, asset.longitude], Math.max(map.getZoom(), 15), { animate: true });
+}
+
+async function openUploadedAttachment(attachment: ApplicationFormAttachment) {
+  const formId = selectedForm.value?.id;
+  if (!formId) return;
+  try {
+    await openApplicationFormAttachment(formId, attachment.id);
+  } catch (error) {
+    media.error = error instanceof Error ? error.message : 'Falha ao abrir o anexo.';
+  }
 }
 
 async function saveDraft() {

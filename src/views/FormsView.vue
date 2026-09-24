@@ -2,23 +2,8 @@
   <section class="view-stack">
     <div class="view-header">
       <div>
-        <h2>Formulários</h2>
-        <p>Cadastre requerimentos e gere automaticamente pontos no Mapa GIS e no Inventário.</p>
-      </div>
-      <div class="row-actions">
-        <v-btn variant="tonal" prepend-icon="mdi-file-import-outline" @click="openFilePicker">
-          Importar Formulário
-        </v-btn>
-        <v-btn color="primary" prepend-icon="mdi-form-select" @click="openCreate">
-          Preencher Novo Formulário
-        </v-btn>
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".json,.csv,application/json,text/csv"
-          class="d-none"
-          @change="importFile"
-        >
+        <h2>Solicitações Recebidas</h2>
+        <p>Consulte e analise as solicitações enviadas pelo formulário público.</p>
       </div>
     </div>
 
@@ -42,6 +27,7 @@
             <tr>
               <th>Processo</th>
               <th>Empresa responsável</th>
+              <th>CNPJ</th>
               <th>Inscrição municipal</th>
               <th>Local</th>
               <th>Tipo de veículo</th>
@@ -53,16 +39,17 @@
           </thead>
           <tbody>
             <tr v-if="filteredForms.length === 0">
-              <td colspan="9">
+              <td colspan="10">
                 <div class="empty-table">
                   <v-icon icon="mdi-file-document-outline" size="42" />
-                  <span>Nenhum formulário encontrado.</span>
+                  <span>Nenhuma solicitação recebida encontrada.</span>
                 </div>
               </td>
             </tr>
             <tr v-for="item in filteredForms" :key="item.id">
               <td class="mono strong">{{ item.process_code }}</td>
               <td>{{ item.company_responsible }}</td>
+              <td class="mono">{{ item.company_cnpj || '—' }}</td>
               <td class="mono">{{ item.municipal_registration }}</td>
               <td>{{ item.street }}, {{ item.number }} · {{ item.district }}</td>
               <td>{{ mediaTypeLabel(item.media_type) }}</td>
@@ -86,7 +73,7 @@
                     icon="mdi-pencil-outline"
                     size="small"
                     variant="tonal"
-                    title="Editar formulário"
+                    title="Editar solicitação"
                     @click="openEdit(item)"
                   />
                   <v-btn
@@ -105,7 +92,7 @@
                     size="small"
                     color="error"
                     variant="tonal"
-                    title="Excluir formulário e ponto"
+                    title="Excluir solicitação e ponto"
                     @click="deleteTarget = item"
                   />
                 </div>
@@ -118,16 +105,12 @@
 
     <v-dialog v-model="dialog" max-width="980" scrollable>
       <v-card>
-        <v-card-title>{{ editingId ? 'Editar Formulário' : 'Novo Formulário' }}</v-card-title>
+        <v-card-title>Editar Solicitação Recebida</v-card-title>
         <v-card-subtitle>
           Ao salvar, o processo será sincronizado automaticamente com o Mapa GIS e o Inventário.
         </v-card-subtitle>
 
         <v-card-text>
-          <v-alert v-if="importedFileName" type="info" variant="tonal" density="compact" class="mb-4">
-            Dados importados de {{ importedFileName }}. Revise os campos antes de salvar.
-          </v-alert>
-
           <v-form v-model="formValid" class="form-grid" @submit.prevent="save">
             <v-text-field
               v-model="form.company_responsible"
@@ -139,6 +122,12 @@
               v-model="form.municipal_registration"
               label="Inscrição municipal"
               :rules="[required]"
+            />
+            <v-text-field
+              v-model="form.company_cnpj"
+              label="CNPJ"
+              placeholder="00.000.000/0000-00"
+              :rules="[optionalCnpjRule]"
             />
             <v-text-field
               v-model="form.property_registration"
@@ -191,7 +180,7 @@
             <v-text-field
               v-model="form.number_of_faces"
               label="Quantidade de faces"
-              hint="Opcional para cadastros internos"
+              hint="Opcional"
               persistent-hint
             />
             <v-text-field
@@ -287,22 +276,22 @@
           <v-spacer />
           <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
           <v-btn color="primary" :loading="saving" :disabled="!formValid" @click="save">
-            {{ editingId ? 'Salvar Alterações' : 'Criar Formulário e Ponto' }}
+            Salvar Alterações
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog :model-value="Boolean(deleteTarget)" max-width="480" @update:model-value="!$event && (deleteTarget = null)">
-      <v-card title="Excluir formulário">
+      <v-card title="Excluir solicitação recebida">
         <v-card-text>
-          Excluir o formulário de <strong>{{ deleteTarget?.company_responsible }}</strong> também removerá o processo
+          Excluir a solicitação de <strong>{{ deleteTarget?.company_responsible }}</strong> também removerá o processo
           <strong>{{ deleteTarget?.process_code }}</strong> do mapa e do inventário.
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="deleteTarget = null">Cancelar</v-btn>
-          <v-btn color="error" :loading="saving" @click="confirmDelete">Excluir Formulário e Ponto</v-btn>
+          <v-btn color="error" :loading="saving" @click="confirmDelete">Excluir Solicitação e Ponto</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -324,7 +313,8 @@ import {
 } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
 import { useMediaStore } from '../stores/media';
-import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, MediaType } from '../types';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput } from '../types';
+import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 import { formatDate, formatDateTime } from '../utils/format';
 
@@ -336,8 +326,6 @@ const search = ref('');
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<ApplicationForm | null>(null);
-const fileInput = ref<HTMLInputElement | null>(null);
-const importedFileName = ref('');
 const formValid = ref(false);
 const saving = ref(false);
 const locating = ref(false);
@@ -353,6 +341,10 @@ const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior
 const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
 const emailRule = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'E-mail inválido.';
 const postalCodeRule = (value: string) => /^\d{5}-?\d{3}$/.test(value) || 'Informe um CEP válido.';
+const optionalCnpjRule = (value: string | null | undefined) => {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return !digits || digits.length === 14 || 'O CNPJ deve conter 14 dígitos.';
+};
 const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
   (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
 );
@@ -365,6 +357,7 @@ const filteredForms = computed(() => {
   return forms.value.filter((item) => [
     item.process_code,
     item.company_responsible,
+    item.company_cnpj ?? '',
     item.municipal_registration,
     item.property_registration,
     item.street,
@@ -377,6 +370,7 @@ onMounted(loadForms);
 function blankForm(): ApplicationFormInput {
   return {
     company_responsible: '',
+    company_cnpj: null,
     municipal_registration: '',
     property_registration: '',
     latitude: -20.464,
@@ -399,24 +393,15 @@ async function loadForms() {
   try {
     forms.value = await api.listApplicationForms();
   } catch (caught) {
-    showMessage(caught instanceof Error ? caught.message : 'Falha ao carregar os formulários.', 'error');
+    showMessage(caught instanceof Error ? caught.message : 'Falha ao carregar as solicitações recebidas.', 'error');
   }
-}
-
-function openCreate() {
-  editingId.value = null;
-  importedFileName.value = '';
-  Object.assign(form, blankForm());
-  resetAttachments('');
-  uploadedAttachments.value = [];
-  dialog.value = true;
 }
 
 function openEdit(item: ApplicationForm) {
   editingId.value = item.id;
-  importedFileName.value = '';
   Object.assign(form, {
     company_responsible: item.company_responsible,
+    company_cnpj: item.company_cnpj ?? null,
     municipal_registration: item.municipal_registration,
     property_registration: item.property_registration,
     latitude: item.latitude,
@@ -475,26 +460,10 @@ function removeAttachment(index: number) {
   attachmentLinks.value = attachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
 }
 
-const attachmentCategoryLabels: Record<string, string> = {
-  alvaraLocalizacao: 'Alvará de localização',
-  requerimentoPadrao: 'Requerimento padrão',
-  autorizacaoProprietario: 'Autorização do proprietário',
-  documentoProprietario: 'Documento do proprietário',
-  projetoEstrutural: 'Projeto estrutural',
-  projetoImplantacao: 'Projeto de implantação',
-  artRrt: 'ART/RRT',
-};
-
-function attachmentCategoryLabel(category: string): string {
-  return attachmentCategoryLabels[category] ?? category;
-}
-
 async function downloadUploadedAttachment(attachment: ApplicationFormAttachment) {
   if (!editingId.value) return;
   try {
-    const { url } = await api.getApplicationFormAttachmentDownload(editingId.value, attachment.id);
-    const opened = window.open(url, '_blank', 'noopener,noreferrer');
-    if (opened) opened.opener = null;
+    await openApplicationFormAttachment(editingId.value, attachment.id);
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao abrir o anexo.', 'error');
   }
@@ -504,6 +473,7 @@ function sanitizeForm(): ApplicationFormInput {
   return {
     ...form,
     company_responsible: form.company_responsible.trim(),
+    company_cnpj: String(form.company_cnpj ?? '').replace(/\D/g, '') || null,
     municipal_registration: form.municipal_registration.trim(),
     property_registration: form.property_registration.trim(),
     street: form.street.trim(),
@@ -521,20 +491,15 @@ function sanitizeForm(): ApplicationFormInput {
 }
 
 async function save() {
-  if (!formValid.value) return;
+  if (!formValid.value || !editingId.value) return;
   saving.value = true;
   try {
-    if (editingId.value) {
-      await api.updateApplicationForm(editingId.value, sanitizeForm());
-      showMessage('Formulário e ponto atualizados com sucesso.', 'success');
-    } else {
-      const created = await api.createApplicationForm(sanitizeForm());
-      showMessage(`Formulário salvo e processo ${created.process_code} adicionado ao sistema.`, 'success');
-    }
+    await api.updateApplicationForm(editingId.value, sanitizeForm());
+    showMessage('Solicitação e ponto atualizados com sucesso.', 'success');
     await Promise.all([loadForms(), media.loadAll()]);
     dialog.value = false;
   } catch (caught) {
-    showMessage(caught instanceof Error ? caught.message : 'Falha ao salvar o formulário.', 'error');
+    showMessage(caught instanceof Error ? caught.message : 'Falha ao salvar a solicitação.', 'error');
   } finally {
     saving.value = false;
   }
@@ -547,9 +512,9 @@ async function confirmDelete() {
     await api.deleteApplicationForm(deleteTarget.value.id);
     deleteTarget.value = null;
     await Promise.all([loadForms(), media.loadAll()]);
-    showMessage('Formulário e ponto removidos do sistema.', 'success');
+    showMessage('Solicitação e ponto removidos do sistema.', 'success');
   } catch (caught) {
-    showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir o formulário.', 'error');
+    showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir a solicitação.', 'error');
   } finally {
     saving.value = false;
   }
@@ -571,117 +536,6 @@ async function startAnalysis(item: ApplicationForm) {
 function viewOnMap(item: ApplicationForm) {
   media.selectAsset(item.asset_id);
   void router.push({ name: 'map', query: { asset: item.asset_id } });
-}
-
-function openFilePicker() {
-  fileInput.value?.click();
-}
-
-async function importFile(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = '';
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const record = file.name.toLocaleLowerCase().endsWith('.csv') ? parseCsv(text) : JSON.parse(text);
-    const source = Array.isArray(record) ? record[0] : record;
-    if (!source || typeof source !== 'object') throw new Error('O arquivo não contém um formulário válido.');
-    const imported = normalizeImportedRecord(source as Record<string, unknown>);
-    editingId.value = null;
-    Object.assign(form, blankForm(), imported);
-    resetAttachments(imported.attachment_links);
-    importedFileName.value = file.name;
-    dialog.value = true;
-  } catch (caught) {
-    showMessage(caught instanceof Error ? caught.message : 'Não foi possível importar o arquivo.', 'error');
-  }
-}
-
-function parseCsv(text: string): Record<string, string> {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length < 2) throw new Error('O CSV deve conter cabeçalho e pelo menos uma linha de dados.');
-  const delimiter = lines[0].includes(';') ? ';' : ',';
-  const headers = splitCsvLine(lines[0], delimiter);
-  const values = splitCsvLine(lines[1], delimiter);
-  return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
-}
-
-function splitCsvLine(line: string, delimiter: string): string[] {
-  const values: string[] = [];
-  let current = '';
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (character === '"' && line[index + 1] === '"') {
-      current += '"';
-      index += 1;
-    } else if (character === '"') {
-      quoted = !quoted;
-    } else if (character === delimiter && !quoted) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += character;
-    }
-  }
-  values.push(current.trim());
-  return values;
-}
-
-function normalizeImportedRecord(source: Record<string, unknown>): Partial<ApplicationFormInput> {
-  const normalized = Object.fromEntries(Object.entries(source).map(([key, value]) => [normalizeKey(key), value]));
-  const value = (...keys: string[]) => keys.map((key) => normalized[key]).find((item) => item != null && item !== '');
-  const coordinateText = String(value('coordenadas_geograficas', 'coordenadas') ?? '');
-  const coordinates = coordinateText.split(/[,;\s]+/).map(Number).filter(Number.isFinite);
-  const rawMediaType = String(value('media_type', 'tipo_de_veiculo', 'tipo_veiculo', 'tipo') ?? '');
-  const mediaType = resolveMediaType(rawMediaType);
-  const rawLinks = value('attachment_links', 'links_dos_anexos', 'links_anexos', 'anexos');
-  const links = Array.isArray(rawLinks) ? rawLinks.join('\n') : String(rawLinks ?? '');
-  const expirationDate = normalizeImportedDate(value('expiration_date', 'vencimento', 'data_de_vencimento'));
-
-  return {
-    company_responsible: String(value('company_responsible', 'empresa_responsavel', 'empresa') ?? ''),
-    municipal_registration: String(value('municipal_registration', 'inscricao_municipal') ?? ''),
-    property_registration: String(value('property_registration', 'inscricao_imobiliaria') ?? ''),
-    latitude: Number(value('latitude') ?? coordinates[0] ?? -20.464),
-    longitude: Number(value('longitude') ?? coordinates[1] ?? -54.612),
-    street: String(value('street', 'rua', 'logradouro') ?? ''),
-    number: String(value('number', 'numero') ?? ''),
-    district: String(value('district', 'bairro') ?? 'Centro'),
-    postal_code: String(value('postal_code', 'cep') ?? ''),
-    media_type: mediaType,
-    area_m2: Number(value('area_m2', 'area', 'area_do_veiculo') ?? 1),
-    bottom_height_m: Number(value('bottom_height_m', 'altura', 'altura_da_borda_inferior') ?? 0),
-    expiration_date: expirationDate,
-    requester_email: String(value('requester_email', 'email_do_requerente', 'email') ?? ''),
-    attachment_links: links,
-  };
-}
-
-function normalizeImportedDate(value: unknown): string | null {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  const brazilianDate = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
-  if (brazilianDate) return `${brazilianDate[3]}-${brazilianDate[2]}-${brazilianDate[1]}`;
-  return raw.slice(0, 10);
-}
-
-function resolveMediaType(value: string): MediaType {
-  const normalized = normalizeKey(value);
-  const option = registrationMediaTypeOptions.value.find((item) => (
-    normalizeKey(item.value) === normalized || normalizeKey(item.title) === normalized
-  ));
-  return option?.value ?? 'outdoor';
-}
-
-function normalizeKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('pt-BR')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
 }
 
 function showMessage(text: string, type: 'success' | 'error' | 'info') {

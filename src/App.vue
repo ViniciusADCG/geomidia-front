@@ -123,7 +123,7 @@ const navItems = computed(() => [
   { title: 'Inventário', value: 'inventory', to: '/inventario', icon: 'mdi-folder-table-outline' },
   { title: 'Vencimentos', value: 'expirations', to: '/vencimentos', icon: 'mdi-calendar-alert-outline' },
   ...(auth.canWrite
-    ? [{ title: 'Formulário', value: 'forms', to: '/formularios', icon: 'mdi-form-select' }]
+    ? [{ title: 'Solicitações Recebidas', value: 'forms', to: '/formularios', icon: 'mdi-inbox-arrow-down-outline' }]
     : []),
   ...(auth.role === 'admin'
     ? [

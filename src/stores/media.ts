@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { api } from '../services/api';
-import type { ActivityLog, ConflictAnalysis, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
+import type { ActivityLog, ApplicationForm, ConflictAnalysis, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
 
 const EMPTY_STATS: MediaStats = {
   total: 0,
@@ -21,6 +21,10 @@ interface MediaState {
   rules: MediaRule[];
   stats: MediaStats;
   selectedAssetId: string | null;
+  applicationForms: ApplicationForm[];
+  applicationFormsLoaded: boolean;
+  applicationFormsLoading: boolean;
+  applicationFormsError: string | null;
   analysisByAssetId: Record<string, ConflictAnalysis>;
   loading: boolean;
   saving: boolean;
@@ -40,6 +44,10 @@ export const useMediaStore = defineStore('media', {
     rules: [],
     stats: EMPTY_STATS,
     selectedAssetId: null,
+    applicationForms: [],
+    applicationFormsLoaded: false,
+    applicationFormsLoading: false,
+    applicationFormsError: null,
     analysisByAssetId: {},
     loading: false,
     saving: false,
@@ -48,8 +56,26 @@ export const useMediaStore = defineStore('media', {
   }),
   getters: {
     selectedAsset: (state) => state.assets.find((asset) => asset.id === state.selectedAssetId) ?? null,
+    selectedApplicationForm: (state) => state.applicationForms.find((form) => form.asset_id === state.selectedAssetId) ?? null,
   },
   actions: {
+    async loadApplicationFormsForMap(force = false) {
+      if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force)) return;
+      this.applicationFormsLoading = true;
+      this.applicationFormsError = null;
+      if (force) {
+        this.applicationForms = [];
+        this.applicationFormsLoaded = false;
+      }
+      try {
+        this.applicationForms = await api.listApplicationForms();
+        this.applicationFormsLoaded = true;
+      } catch (error) {
+        this.applicationFormsError = messageFrom(error, 'Falha ao carregar os dados da solicitação.');
+      } finally {
+        this.applicationFormsLoading = false;
+      }
+    },
     async loadAll() {
       this.loading = true;
       this.error = null;

@@ -47,14 +47,24 @@ function errorMessage(payload: unknown): string {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = accessToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    throw new ApiError(
+      `Não foi possível comunicar com a API em ${API_BASE_URL}. O navegador não recebeu uma resposta; `
+        + 'verifique a rede, DNS/TLS, a política de CORS e as restrições do deployment, como um preview protegido.',
+      0,
+      error,
+    );
+  }
 
   if (response.status === 204) return undefined as T;
   const payload = await response.json().catch(() => null);
@@ -151,9 +161,6 @@ export const api = {
   },
   listApplicationForms(search = '') {
     return request<ApplicationForm[]>(`/application-forms${queryString({ search })}`);
-  },
-  createApplicationForm(input: ApplicationFormInput) {
-    return request<ApplicationForm>('/application-forms', { method: 'POST', body: JSON.stringify(input) });
   },
   updateApplicationForm(id: string, input: Partial<ApplicationFormInput>) {
     return request<ApplicationForm>(`/application-forms/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
