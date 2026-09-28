@@ -458,6 +458,7 @@ watch(selectedAsset, (asset) => {
 
 onMounted(async () => {
   if (auth.canWrite) void media.loadApplicationFormsForMap(true);
+  if (!media.loading) void media.loadAll().catch(() => undefined);
   await nextTick();
   if (!mapElement.value) return;
   if (sideStack.value) L.DomEvent.disableScrollPropagation(sideStack.value);
