@@ -13,6 +13,7 @@ import type {
   MediaStatus,
   MediaType,
   Page,
+  RequirementResponse,
   User,
   UserInput,
 } from '../types';
@@ -75,6 +76,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(errorMessage(payload), response.status, payload);
   }
   return payload as T;
+}
+
+async function requestPdf(path: string): Promise<Blob> {
+  const token = accessToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    throw new ApiError('Não foi possível conectar à API para baixar o comprovante.', 0);
+  }
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new CustomEvent('geomidia:unauthorized'));
+    const payload = await response.json().catch(() => null);
+    throw new ApiError(errorMessage(payload), response.status, payload);
+  }
+  return response.blob();
 }
 
 function queryString(params: Record<string, string | number | undefined>): string {
@@ -170,5 +189,14 @@ export const api = {
   },
   getApplicationFormAttachmentDownload(formId: string, attachmentId: string) {
     return request<{ url: string }>(`/application-forms/${formId}/attachments/${attachmentId}/download`);
+  },
+  listRequirementResponses(search = '', limit = 50, offset = 0) {
+    return request<Page<RequirementResponse>>(`/requirement-responses${queryString({ search, limit, offset })}`);
+  },
+  getRequirementAttachmentDownload(responseId: string, attachmentIndex: number) {
+    return request<{ url: string }>(`/requirement-responses/${responseId}/attachments/${attachmentIndex}/download`);
+  },
+  getRequirementReceipt(responseId: string) {
+    return requestPdf(`/requirement-responses/${responseId}/comprovante`);
   },
 };

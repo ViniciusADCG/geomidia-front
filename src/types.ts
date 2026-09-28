@@ -127,6 +127,24 @@ export interface ApplicationForm {
   updated_at: string;
 }
 
+export interface RequirementResponseAttachment {
+  index: number;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+}
+
+export interface RequirementResponse {
+  id: string;
+  protocol: string;
+  process_number: string;
+  notice_number: string;
+  requester_email: string;
+  finalized_at: string;
+  receipt_sent: boolean;
+  attachments: RequirementResponseAttachment[];
+}
+
 export type ApplicationFormInput = Omit<
   ApplicationForm,
   'id' | 'asset_id' | 'process_code' | 'status' | 'attachments' | 'created_at' | 'updated_at'

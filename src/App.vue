@@ -123,7 +123,10 @@ const navItems = computed(() => [
   { title: 'Inventário', value: 'inventory', to: '/inventario', icon: 'mdi-folder-table-outline' },
   { title: 'Vencimentos', value: 'expirations', to: '/vencimentos', icon: 'mdi-calendar-alert-outline' },
   ...(auth.canWrite
-    ? [{ title: 'Solicitações Recebidas', value: 'forms', to: '/formularios', icon: 'mdi-inbox-arrow-down-outline' }]
+    ? [
+      { title: 'Solicitações Recebidas', value: 'forms', to: '/formularios', icon: 'mdi-inbox-arrow-down-outline' },
+      { title: 'Comunicado de Exigência', value: 'requirements', to: '/comunicados-de-exigencia', icon: 'mdi-file-document-alert-outline' },
+    ]
     : []),
   ...(auth.role === 'admin'
     ? [
@@ -144,7 +147,7 @@ onMounted(async () => {
 
 onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
 
-function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'forms' | 'users' | 'rules') {
+function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'forms' | 'requirements' | 'users' | 'rules') {
   void router.push({ name: view });
 }
 

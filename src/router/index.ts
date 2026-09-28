@@ -18,6 +18,7 @@ export const router = createRouter({
     { path: '/inventario', name: 'inventory', component: () => import('../views/InventoryView.vue') },
     { path: '/vencimentos', name: 'expirations', component: () => import('../views/ExpirationsView.vue') },
     { path: '/formularios', name: 'forms', component: () => import('../views/FormsView.vue'), meta: { write: true } },
+    { path: '/comunicados-de-exigencia', name: 'requirements', component: () => import('../views/RequirementsView.vue'), meta: { write: true } },
     { path: '/usuarios', name: 'users', component: () => import('../views/UsersView.vue'), meta: { admin: true } },
     { path: '/regras', name: 'rules', component: () => import('../views/RulesView.vue'), meta: { admin: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
