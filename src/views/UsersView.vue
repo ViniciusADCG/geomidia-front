@@ -22,7 +22,7 @@
             <td>{{ user.email || '—' }}</td>
             <td><v-chip size="small" variant="tonal">{{ roleLabel(user.role) }}</v-chip></td>
             <td>
-              <v-chip :color="user.is_active ? 'success' : 'error'" size="small" variant="tonal">
+              <v-chip :color="user.is_active ? 'success' : 'error'" size="small" variant="tonal" class="status-chip">
                 {{ user.is_active ? 'Ativo' : 'Inativo' }}
               </v-chip>
             </td>

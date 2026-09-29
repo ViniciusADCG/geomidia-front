@@ -1,9 +1,10 @@
 <template>
-  <v-app-bar flat height="60" color="white" class="admin-topbar">
+  <v-app-bar flat height="58" class="admin-topbar">
     <v-app-bar-nav-icon v-if="showMenu" @click="$emit('toggle-menu')" />
     <div class="topbar-context">
-      <span class="scope-chip">Prefeitura Municipal</span>
+      <img class="scope-chip-image" src="/prefeitura-municipal.png" alt="Prefeitura Municipal" width="158" height="33" />
       <span class="topbar-department">Secretaria de Planejamento e Meio Ambiente</span>
+      <img class="prefcg-logo" src="/prefcg-logo.png" alt="PREFCG" width="140" height="33" />
     </div>
     <v-spacer />
     <v-btn

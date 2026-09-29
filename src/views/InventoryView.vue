@@ -65,7 +65,7 @@
               </td>
             </tr>
             <tr v-for="asset in filteredAssets" :key="asset.id">
-              <td class="mono strong">{{ asset.process_code }}</td>
+              <td class="process-code">{{ asset.process_code }}</td>
               <td class="address-cell">{{ asset.address }}</td>
               <td>{{ asset.district }}</td>
               <td class="type-cell">{{ mediaTypeLabel(asset.media_type) }}</td>
@@ -75,7 +75,7 @@
               </td>
               <td class="mono">{{ formatDate(asset.expiration_date) }}</td>
               <td>
-                <v-chip :color="statusColor(asset.status)" size="small" variant="tonal">
+                <v-chip :color="statusColor(asset.status)" size="small" variant="tonal" class="status-chip">
                   {{ statusLabel(asset.status) }}
                 </v-chip>
               </td>
@@ -285,7 +285,7 @@
       <v-card title="Confirmar exclusão">
         <v-card-text>
           Remover permanentemente o processo
-          <strong>{{ deleteTarget?.process_code }}</strong> do inventário?
+          <strong class="process-code">{{ deleteTarget?.process_code }}</strong> do inventário?
         </v-card-text>
         <v-card-actions>
           <v-spacer />

@@ -37,11 +37,11 @@
             </td>
           </tr>
           <tr v-for="asset in items" :key="asset.id">
-            <td class="mono strong">{{ asset.process_code }}</td>
+            <td class="process-code">{{ asset.process_code }}</td>
             <td class="address-cell">{{ asset.address }} · {{ asset.district }}</td>
             <td class="type-cell">{{ mediaTypeLabel(asset.media_type) }}</td>
             <td>
-              <v-chip :color="statusColor(asset.status)" size="small" variant="tonal">
+              <v-chip :color="statusColor(asset.status)" size="small" variant="tonal" class="status-chip">
                 {{ statusLabel(asset.status) }}
               </v-chip>
             </td>
@@ -54,6 +54,7 @@
                 icon="mdi-map-marker-outline"
                 size="small"
                 variant="tonal"
+                class="table-action"
                 title="Visualizar no mapa"
                 @click="$emit('view-map', asset)"
               />

@@ -50,9 +50,9 @@
               </td>
             </tr>
             <tr v-for="item in page.items" :key="item.id">
-              <td class="mono strong">{{ item.protocol }}</td>
-              <td class="mono">{{ item.process_number }}</td>
-              <td class="mono">{{ item.notice_number }}</td>
+              <td class="process-code">{{ item.protocol }}</td>
+              <td class="process-code">{{ item.process_number }}</td>
+              <td class="process-code">{{ item.notice_number }}</td>
               <td>{{ item.requester_email }}</td>
               <td>{{ formatDateTime(item.finalized_at) }}</td>
               <td>{{ item.attachments.length }}</td>
@@ -74,10 +74,10 @@
 
     <v-dialog :model-value="Boolean(selected)" max-width="760" scrollable @update:model-value="(open) => { if (!open) selected = null; }">
       <v-card v-if="selected">
-        <v-card-title>Resposta {{ selected.protocol }}</v-card-title>
+        <v-card-title>Resposta <span class="process-code">{{ selected.protocol }}</span></v-card-title>
         <v-card-text>
-          <div class="mb-2"><strong>Número do processo:</strong> {{ selected.process_number }}</div>
-          <div class="mb-2"><strong>Número do comunicado:</strong> {{ selected.notice_number }}</div>
+          <div class="mb-2"><strong>Número do processo:</strong> <span class="process-code">{{ selected.process_number }}</span></div>
+          <div class="mb-2"><strong>Número do comunicado:</strong> <span class="process-code">{{ selected.notice_number }}</span></div>
           <div class="mb-2"><strong>E-mail do requerente:</strong> {{ selected.requester_email }}</div>
           <div class="mb-2"><strong>Recebido em:</strong> {{ formatDateTime(selected.finalized_at) }}</div>
           <strong>Documentos anexados</strong>

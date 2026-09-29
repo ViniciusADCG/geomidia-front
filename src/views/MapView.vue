@@ -82,12 +82,12 @@
         <template v-if="selectedAsset">
           <div class="analysis-card-header selected-header">
             <div>
-              <v-chip size="small" color="primary" variant="tonal">{{ selectedAsset.process_code }}</v-chip>
+              <v-chip size="small" color="primary" variant="tonal" class="process-code">{{ selectedAsset.process_code }}</v-chip>
               <h3>{{ selectedAsset.address }}</h3>
               <span>{{ selectedAsset.district }} · {{ mediaTypeLabel(selectedAsset.media_type) }}</span>
             </div>
             <div class="selected-header-actions">
-              <v-chip :color="statusColor(selectedAsset.status)" variant="tonal">
+              <v-chip :color="statusColor(selectedAsset.status)" variant="tonal" class="status-chip">
                 {{ statusLabel(selectedAsset.status) }}
               </v-chip>
               <v-btn icon="mdi-close" size="small" variant="text" title="Fechar detalhes" aria-label="Fechar detalhes" @click="media.selectAsset(null)" />
@@ -97,7 +97,7 @@
           <div ref="detailScrollElement" class="analysis-card-body">
           <h4 class="detail-section-title">Dados do processo</h4>
           <div class="spec-grid">
-            <div><span>Protocolo</span><strong>{{ selectedAsset.process_code }}</strong></div>
+            <div><span>Protocolo</span><strong class="process-code">{{ selectedAsset.process_code }}</strong></div>
             <div><span>Status</span><strong>{{ statusLabel(selectedAsset.status) }}</strong></div>
             <div><span>Criado em</span><strong>{{ formatDateTime(selectedAsset.created_at) }}</strong></div>
             <div><span>Atualizado em</span><strong>{{ formatDateTime(selectedAsset.updated_at) }}</strong></div>

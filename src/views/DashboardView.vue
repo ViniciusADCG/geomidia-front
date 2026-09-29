@@ -1,5 +1,5 @@
 <template>
-  <section class="view-stack">
+  <section class="view-stack dashboard-view">
     <div class="view-header">
       <div>
         <h2>Dashboard</h2>
@@ -19,18 +19,22 @@
         :to="card.to"
         border
       >
-        <div>
-          <span :class="['kpi-label', card.className]">{{ card.label }}</span>
-          <strong>{{ card.value }}</strong>
-          <small>{{ card.caption }}</small>
+        <div class="kpi-card-content">
+          <div class="kpi-heading">
+            <span class="kpi-label">{{ card.label }}</span>
+            <v-icon class="kpi-icon" :icon="card.icon" size="20" aria-hidden="true" />
+          </div>
+          <div class="kpi-card-summary">
+            <strong>{{ card.value }}</strong>
+            <small>{{ card.caption }}</small>
+          </div>
         </div>
-        <v-icon :icon="card.icon" size="34" :color="card.color" />
       </v-card>
     </div>
 
     <v-row>
       <v-col cols="12">
-        <v-card border class="pa-5">
+        <v-card border class="pa-5 dashboard-panel">
           <div class="card-title-row">
             <h3>Ativos por Tipo de Veículo</h3>
             <v-btn variant="text" color="primary" append-icon="mdi-arrow-right" @click="$emit('navigate', 'map')">
@@ -60,7 +64,7 @@
       </v-col>
 
       <v-col cols="12">
-        <v-card border class="pa-5 activity-card">
+        <v-card border class="pa-5 activity-card dashboard-panel">
           <h3>Atividades Recentes</h3>
           <div v-if="media.activities.length === 0" class="empty-state compact">
             <v-icon icon="mdi-clipboard-text-clock-outline" size="36" />
@@ -75,7 +79,7 @@
               </template>
               <v-list-item-title>{{ activity.message }}</v-list-item-title>
               <v-list-item-subtitle>
-                {{ activity.process_code }} · {{ formatDateTime(activity.created_at) }}
+                <span class="process-code">{{ activity.process_code }}</span> · {{ formatDateTime(activity.created_at) }}
               </v-list-item-subtitle>
             </v-list-item>
           </v-list>
@@ -104,8 +108,7 @@ const kpis = computed(() => [
     label: 'Total de Ativos',
     value: media.stats.total,
     caption: `${media.stats.total} registro(s)`,
-    icon: 'mdi-folder-table-outline',
-    color: 'primary',
+    icon: 'mdi-calendar-month-outline',
     className: 'blue',
     to: undefined,
   },
@@ -114,7 +117,6 @@ const kpis = computed(() => [
     value: media.stats.new_processes,
     caption: 'Aguardando início da análise',
     icon: 'mdi-inbox-arrow-down-outline',
-    color: 'info',
     className: 'cyan',
     to: undefined,
   },
@@ -122,8 +124,7 @@ const kpis = computed(() => [
     label: 'Em Análise',
     value: media.stats.pending,
     caption: 'Processos em análise técnica',
-    icon: 'mdi-file-search-outline',
-    color: 'warning',
+    icon: 'mdi-magnify',
     className: 'amber',
     to: undefined,
   },
@@ -132,7 +133,6 @@ const kpis = computed(() => [
     value: media.stats.approved,
     caption: 'Ativos aprovados',
     icon: 'mdi-check-decagram-outline',
-    color: 'success',
     className: 'green',
     to: undefined,
   },
@@ -141,7 +141,6 @@ const kpis = computed(() => [
     value: media.stats.rejected,
     caption: 'Solicitações irregulares',
     icon: 'mdi-alert-octagon-outline',
-    color: 'error',
     className: 'red',
     to: undefined,
   },
@@ -150,7 +149,6 @@ const kpis = computed(() => [
     value: media.stats.expiring_soon,
     caption: 'Vencem nos próximos 90 dias',
     icon: 'mdi-calendar-clock-outline',
-    color: 'deep-orange',
     className: 'orange',
     to: '/vencimentos',
   },
@@ -159,7 +157,6 @@ const kpis = computed(() => [
     value: media.stats.expired,
     caption: 'Autorizações já vencidas',
     icon: 'mdi-calendar-remove-outline',
-    color: 'red-darken-2',
     className: 'burgundy',
     to: '/vencimentos',
   },

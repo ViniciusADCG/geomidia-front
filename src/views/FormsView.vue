@@ -47,7 +47,7 @@
               </td>
             </tr>
             <tr v-for="item in filteredForms" :key="item.id">
-              <td class="mono strong">{{ item.process_code }}</td>
+              <td class="process-code">{{ item.process_code }}</td>
               <td>{{ item.company_responsible }}</td>
               <td class="mono">{{ item.company_cnpj || '—' }}</td>
               <td class="mono">{{ item.municipal_registration }}</td>
@@ -55,7 +55,7 @@
               <td>{{ mediaTypeLabel(item.media_type) }}</td>
               <td class="mono">{{ formatDate(item.expiration_date) }}</td>
               <td>
-                <v-chip :color="statusColor(item.status)" size="small" variant="tonal">
+                <v-chip :color="statusColor(item.status)" size="small" variant="tonal" class="status-chip">
                   {{ statusLabel(item.status) }}
                 </v-chip>
               </td>
@@ -286,7 +286,7 @@
       <v-card title="Excluir solicitação recebida">
         <v-card-text>
           Excluir a solicitação de <strong>{{ deleteTarget?.company_responsible }}</strong> também removerá o processo
-          <strong>{{ deleteTarget?.process_code }}</strong> do mapa e do inventário.
+          <strong class="process-code">{{ deleteTarget?.process_code }}</strong> do mapa e do inventário.
         </v-card-text>
         <v-card-actions>
           <v-spacer />

@@ -58,7 +58,7 @@
                 <span v-else class="muted">Não se aplica</span>
               </td>
               <td>
-                <v-chip :color="rule.is_active ? 'success' : 'error'" size="small" variant="tonal">
+                <v-chip :color="rule.is_active ? 'success' : 'error'" size="small" variant="tonal" class="status-chip">
                   {{ rule.is_active ? 'Ativa' : 'Inativa' }}
                 </v-chip>
               </td>
