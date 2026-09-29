@@ -2,90 +2,103 @@
   <main class="login-shell">
     <div class="login-stage">
       <v-card class="login-card">
-
-
-        <div class="login-logo">
-          <span class="login-eyebrow">Acesso ao sistema</span>
+        <div class="login-hero">
           <div class="login-map-icon" aria-hidden="true">
-          <v-icon icon="mdi-map-marker-radius" size="34" />
+            <svg viewBox="0 0 110 110" focusable="false">
+              <path d="M8 69 55 87l47-18-16-7-31 12-31-12Z" fill="#73d9ff" />
+              <path d="M8 82 55 100l47-18-16-7-31 12-31-12Z" fill="#57c9f5" />
+              <path d="M55 10c-16 0-28 12-28 28 0 18 28 48 28 48s28-30 28-48c0-16-12-28-28-28Z" fill="#fff" />
+              <circle cx="55" cy="38" r="10" fill="#0e4d82" />
+              <circle cx="55" cy="38" r="5.5" fill="#67d0fa" />
+            </svg>
+          </div>
+          <div class="login-logo">
+            <h1>Geo<span>Mídia</span></h1>
+            <p>Gestão de Mídia Exterior e GIS · GeoMídia v1.0</p>
+          </div>
         </div>
-          <h1>GeoMídia</h1>
-          <p>Gestão de Mídia Exterior e GIS</p>
-        </div>
 
-        <v-alert
-          v-if="errorMessage"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mb-4"
-        >
-          {{ errorMessage }}
-        </v-alert>
-
-        <v-alert
-          v-if="helpMessage"
-          type="info"
-          variant="tonal"
-          density="compact"
-          closable
-          class="mb-4"
-          @click:close="helpMessage = ''"
-        >
-          {{ helpMessage }}
-        </v-alert>
-
-        <v-form v-model="valid" class="login-form" @submit.prevent="submit">
-          <v-text-field
-            v-model="username"
-            label="Usuário"
-            prepend-inner-icon="mdi-account-outline"
-            autocomplete="username"
-            :rules="[required, usernameRule]"
-          />
-          <v-text-field
-            v-model="password"
-            label="Senha"
-            :type="showPassword ? 'text' : 'password'"
-            prepend-inner-icon="mdi-lock-outline"
-            :append-inner-icon="showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'"
-            autocomplete="current-password"
-            :rules="[required, passwordRule]"
-            @click:append-inner="showPassword = !showPassword"
-          />
-
-          <div class="login-options">
-            <v-checkbox
-              v-model="remember"
-              label="Lembrar de mim"
-              density="compact"
-              hide-details
-            />
-            <button type="button" class="login-help" @click="showPasswordHelp">
-              Esqueceu sua senha?
-            </button>
+        <div class="login-content">
+          <div class="login-intro">
+            <h2>Acesso ao sistema</h2>
+            <p>Informe suas credenciais para continuar<br class="login-intro-break" /> no GeoMídia.</p>
           </div>
 
-          <v-btn
-            type="submit"
-            class="login-submit"
-            size="large"
-            block
-            :loading="auth.loading"
-            :disabled="!valid"
-            append-icon="mdi-arrow-right"
+          <v-alert
+            v-if="errorMessage"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
           >
-            Entrar
-          </v-btn>
+            {{ errorMessage }}
+          </v-alert>
+
+          <v-alert
+            v-if="helpMessage"
+            type="info"
+            variant="tonal"
+            density="compact"
+            closable
+            class="mb-4"
+            @click:close="helpMessage = ''"
+          >
+            {{ helpMessage }}
+          </v-alert>
+
+          <v-form v-model="valid" class="login-form" @submit.prevent="submit">
+            <v-text-field
+              v-model="username"
+              label="Usuário"
+              prepend-inner-icon="mdi-account-outline"
+              autocomplete="username"
+              :rules="[required, usernameRule]"
+            />
+            <v-text-field
+              v-model="password"
+              label="Senha"
+              :type="showPassword ? 'text' : 'password'"
+              prepend-inner-icon="mdi-lock-outline"
+              :append-inner-icon="showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'"
+              autocomplete="current-password"
+              :rules="[required, passwordRule]"
+              @click:append-inner="showPassword = !showPassword"
+            />
+
+            <div class="login-options">
+              <v-checkbox
+                v-model="remember"
+                label="Lembrar de mim"
+                density="compact"
+                hide-details
+              />
+              <button type="button" class="login-help" @click="showPasswordHelp">
+                Esqueceu sua senha?
+              </button>
+            </div>
+
+            <v-btn
+              type="submit"
+              class="login-submit"
+              size="large"
+              block
+              :loading="auth.loading"
+              :disabled="!valid"
+              append-icon="mdi-arrow-right"
+            >
+              Entrar
+            </v-btn>
+          </v-form>
 
           <div class="login-security">
-            <v-icon icon="mdi-shield-check-outline" size="15" />
-            <span>Ambiente seguro de gestão municipal</span>
+            <div class="login-divider"><span>ou</span></div>
+            <div class="login-security-message">
+              <v-icon icon="mdi-help-circle-outline" size="21" />
+              <span>Ambiente seguro de gestão municipal</span>
+            </div>
           </div>
-        </v-form>
+        </div>
       </v-card>
-
-      <div class="login-version">GeoMídia v1.0</div>
     </div>
   </main>
 </template>
