@@ -4,13 +4,7 @@
       <v-card class="login-card">
         <div class="login-hero">
           <div class="login-map-icon" aria-hidden="true">
-            <svg viewBox="0 0 110 110" focusable="false">
-              <path d="M8 69 55 87l47-18-16-7-31 12-31-12Z" fill="#73d9ff" />
-              <path d="M8 82 55 100l47-18-16-7-31 12-31-12Z" fill="#57c9f5" />
-              <path d="M55 10c-16 0-28 12-28 28 0 18 28 48 28 48s28-30 28-48c0-16-12-28-28-28Z" fill="#fff" />
-              <circle cx="55" cy="38" r="10" fill="#0e4d82" />
-              <circle cx="55" cy="38" r="5.5" fill="#67d0fa" />
-            </svg>
+            <img src="/login-brand-symbol.png" alt="" width="110" height="110" />
           </div>
           <div class="login-logo">
             <h1>Geo<span>Mídia</span></h1>

@@ -253,8 +253,8 @@ body {
   justify-content: center;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(3, 57, 105, 0.88), rgba(2, 45, 91, 0.96)),
-    url('/login-background.png') center 84% / cover no-repeat;
+    linear-gradient(180deg, rgba(2, 38, 81, 0.1), rgba(2, 35, 77, 0.23)),
+    url('/login-hero-city.png') center 65% / cover no-repeat;
   color: #ffffff;
 }
 
@@ -276,13 +276,17 @@ body {
   filter: drop-shadow(0 3px 4px rgba(0, 19, 48, 0.28));
 }
 
-.login-map-icon svg {
+.login-map-icon img {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  transform: translateY(-2px) scale(1.17);
 }
 
 .login-logo {
+  position: relative;
+  top: 4px;
   text-align: center;
   margin-top: -5px;
 }
@@ -301,7 +305,7 @@ body {
 }
 
 .login-logo p {
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   color: #eef7ff;
   font-size: 11px;
   font-weight: 600;
@@ -310,11 +314,11 @@ body {
 }
 
 .login-content {
-  padding: 24px 38px 26px;
+  padding: 24px 38px 44px;
 }
 
 .login-intro {
-  margin-bottom: 24px;
+  margin-bottom: 27px;
   text-align: center;
 }
 
@@ -352,6 +356,11 @@ body {
   min-height: 52px;
   padding-top: 14px;
   padding-bottom: 8px;
+}
+
+.login-card .v-input__details {
+  min-height: 10px;
+  padding-top: 0;
 }
 
 .login-card .v-field__prepend-inner,
@@ -439,6 +448,10 @@ body {
 
 .login-submit.v-btn--disabled .v-btn__content {
   opacity: 1 !important;
+}
+
+.login-submit.v-btn--disabled .v-btn__overlay {
+  opacity: 0 !important;
 }
 
 .login-security {
