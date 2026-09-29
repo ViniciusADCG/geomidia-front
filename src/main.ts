@@ -17,10 +17,10 @@ const vuetify = createVuetify({
       geomidiaLight: {
         dark: false,
         colors: {
-          primary: '#0b4d83',
+          primary: '#0867c9',
           secondary: '#2f6f73',
           surface: '#ffffff',
-          background: '#f4f6f8',
+          background: '#f3f6f9',
           error: '#b42318',
           warning: '#b7791f',
           success: '#237a57',

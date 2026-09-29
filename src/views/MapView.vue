@@ -1,5 +1,12 @@
 <template>
-  <section class="map-layout">
+  <section class="view-stack">
+    <div class="view-header">
+      <div>
+        <h2>Mapa GIS</h2>
+        <p>Campo Grande, MS</p>
+      </div>
+    </div>
+    <div class="map-layout">
     <v-card border class="map-panel">
       <div class="map-topbar">
         <div>
@@ -315,6 +322,7 @@
         </div>
       </v-card>
     </aside>
+    </div>
 
     <v-dialog v-model="confirmDelete" max-width="440">
       <v-card title="Confirmar exclusão">

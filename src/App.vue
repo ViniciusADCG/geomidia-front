@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app :class="route.meta.public ? 'public-shell' : 'admin-shell'">
     <router-view v-if="route.meta.public" />
 
     <template v-else>
@@ -7,8 +7,8 @@
         v-model="drawer"
         :permanent="display.mdAndUp.value"
         :temporary="display.smAndDown.value"
-        color="#202a34"
         width="272"
+        class="admin-sidebar"
       >
         <div class="brand-block">
           <div class="brand-icon">
@@ -48,25 +48,17 @@
         </template>
       </v-navigation-drawer>
 
-      <v-app-bar flat border height="64" color="white">
-        <v-app-bar-nav-icon v-if="display.smAndDown.value" @click="drawer = !drawer" />
-        <v-toolbar-title class="toolbar-title">
-          <span class="scope-chip">Prefeitura Municipal</span>
-          <span class="d-none d-md-inline">Secretaria de Planejamento e Meio Ambiente</span>
-        </v-toolbar-title>
-        <v-spacer />
-        <v-btn icon="mdi-refresh" title="Atualizar dados" variant="text" :loading="media.loading" @click="media.loadAll" />
-        <v-avatar color="primary" size="34">
-          <v-icon icon="mdi-account-outline" />
-        </v-avatar>
-        <div class="user-meta d-none d-sm-block">
-          <strong>{{ roleLabel }}</strong>
-          <span>{{ auth.userName }}</span>
-        </div>
-      </v-app-bar>
+      <admin-topbar
+        :show-menu="display.smAndDown.value"
+        :loading="media.loading"
+        :role-label="roleLabel"
+        :user-name="auth.userName"
+        @toggle-menu="drawer = !drawer"
+        @refresh="media.loadAll"
+      />
 
       <v-main class="app-main">
-        <v-container fluid class="pa-4 pa-md-6">
+        <v-container fluid class="app-content">
           <v-alert
             v-if="media.error"
             type="error"
@@ -106,6 +98,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 
+import AdminTopbar from './components/AdminTopbar.vue';
+import { exitVisualPreview, isVisualPreview } from './router';
 import { useAuthStore } from './stores/auth';
 import { useMediaStore } from './stores/media';
 
@@ -116,6 +110,11 @@ const router = useRouter();
 const display = useDisplay();
 const drawer = ref(true);
 const confirmLogout = ref(false);
+
+if (isVisualPreview()) {
+  auth.role = 'admin';
+  auth.userName = 'Administrador GeoMídia';
+}
 
 const navItems = computed(() => [
   { title: 'Dashboard', value: 'dashboard', to: '/', icon: 'mdi-view-dashboard-outline' },
@@ -140,7 +139,7 @@ const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista G
 
 onMounted(async () => {
   window.addEventListener('geomidia:unauthorized', handleUnauthorized);
-  if (!route.meta.public && await auth.validateSession()) {
+  if (!route.meta.public && !isVisualPreview() && await auth.validateSession()) {
     await media.loadAll().catch(() => undefined);
   }
 });
@@ -157,12 +156,14 @@ function handleViewOnMap(id: string) {
 }
 
 function handleUnauthorized() {
+  if (isVisualPreview()) return;
   auth.logout();
   void router.push({ name: 'login' });
 }
 
 function logout() {
   confirmLogout.value = false;
+  exitVisualPreview();
   auth.logout();
   media.$reset();
   void router.push({ name: 'login' });

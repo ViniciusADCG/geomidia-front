@@ -2,6 +2,23 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import LoginView from '../views/LoginView.vue';
 
+const VISUAL_PREVIEW_KEY = 'geomidia_visual_preview';
+
+function isLocalDev(): boolean {
+  return import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+}
+
+if (isLocalDev() && new URLSearchParams(window.location.search).get('preview') === '1') {
+  sessionStorage.setItem(VISUAL_PREVIEW_KEY, '1');
+}
+
+export function isVisualPreview(): boolean {
+  return isLocalDev() && sessionStorage.getItem(VISUAL_PREVIEW_KEY) === '1';
+}
+
+export function exitVisualPreview(): void {
+  sessionStorage.removeItem(VISUAL_PREVIEW_KEY);
+}
 
 function validStoredSession(): boolean {
   const token = sessionStorage.getItem('geomidia_token') ?? localStorage.getItem('geomidia_token');
@@ -26,6 +43,13 @@ export const router = createRouter({
 });
 
 router.beforeEach((to) => {
+  if (isLocalDev() && to.query.preview === '1') {
+    sessionStorage.setItem(VISUAL_PREVIEW_KEY, '1');
+  }
+  if (isVisualPreview()) {
+    return to.name === 'login' ? { name: 'dashboard' } : true;
+  }
+
   const authenticated = validStoredSession();
   if (!to.meta.public && !authenticated) return { name: 'login', query: { redirect: to.fullPath } };
   if (to.name === 'login' && authenticated) return { name: 'dashboard' };

@@ -15,7 +15,7 @@
       <v-card
         v-for="card in kpis"
         :key="card.label"
-        :class="['kpi-card', { 'kpi-card--clickable': card.to }]"
+        :class="['kpi-card', card.className, { 'kpi-card--clickable': card.to }]"
         :to="card.to"
         border
       >
