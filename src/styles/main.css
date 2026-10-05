@@ -954,6 +954,49 @@ body {
   gap: 14px;
 }
 
+.form-section-title {
+  margin: 12px 0 0;
+  color: #214a67;
+  font-size: 0.88rem;
+}
+
+.form-attachment-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.form-attachment-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e3e9ee;
+  border-radius: 8px;
+}
+
+.form-attachment-item > div {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.form-attachment-item strong,
+.form-attachment-item span,
+.origin-code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.form-attachment-item span,
+.origin-code {
+  color: #73818e;
+  font-size: 0.75rem;
+}
+
 .attachment-crud {
   display: grid;
   gap: 10px;

@@ -133,6 +133,9 @@ export const api = {
   createMediaAsset(input: MediaAssetInput) {
     return request<MediaAsset>('/media-assets', { method: 'POST', body: JSON.stringify(input) });
   },
+  getMediaAsset(id: string) {
+    return request<MediaAsset>(`/media-assets/${id}`);
+  },
   updateMediaAsset(id: string, input: Partial<MediaAssetInput>) {
     return request<MediaAsset>(`/media-assets/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },

@@ -65,7 +65,7 @@
               </td>
             </tr>
             <tr v-for="asset in filteredAssets" :key="asset.id">
-              <td class="process-code">{{ asset.process_code }}</td>
+              <td class="process-code">{{ asset.official_process_code || asset.process_code }}<small v-if="asset.official_process_code" class="origin-code">Origem: {{ asset.process_code }}</small></td>
               <td class="address-cell">{{ asset.address }}</td>
               <td>{{ asset.district }}</td>
               <td class="type-cell">{{ mediaTypeLabel(asset.media_type) }}</td>
@@ -138,38 +138,59 @@
 
         <v-card-text>
           <v-form v-model="formValid" class="form-grid" @submit.prevent="save">
+            <h4 class="form-section-title span-2">Dados do processo</h4>
+            <v-text-field v-if="editingAsset" :model-value="editingAsset.process_code" label="Protocolo de origem" readonly />
+            <v-text-field v-if="editingAsset" v-model="form.official_process_code" label="Protocolo oficial" maxlength="80" hint="Após a protocolização oficial, aparece como protocolo principal." persistent-hint />
+            <v-text-field v-if="editingAsset" :model-value="formatDateTime(editingAsset.created_at)" label="Criado em" readonly />
+            <v-text-field v-if="editingAsset" :model-value="formatDateTime(editingAsset.updated_at)" label="Atualizado em" readonly />
+            <h4 class="form-section-title span-2">Requerente / empresa</h4>
+            <template v-if="selectedForm">
+              <v-text-field v-model="formDetails.company_responsible" label="Empresa / responsável" :rules="[required]" maxlength="120" />
+              <v-text-field v-model="formDetails.company_cnpj" label="CNPJ" maxlength="14" />
+              <v-text-field v-model="formDetails.municipal_registration" label="Inscrição municipal" :rules="[required]" />
+              <v-text-field v-model="formDetails.requester_email" label="E-mail do solicitante" type="email" :rules="[required]" />
+            </template>
+            <v-text-field v-model="form.contact_name" label="Contato do solicitante" />
+            <v-text-field v-if="!selectedForm" v-model="form.contact_email" label="E-mail do solicitante" type="email" />
+            <h4 class="form-section-title span-2">Local de instalação</h4>
+            <v-text-field v-if="selectedForm" v-model="formDetails.property_registration" label="Inscrição imobiliária" :rules="[required]" />
+            <v-text-field v-if="selectedForm" v-model="formDetails.street" label="Logradouro" :rules="[required]" />
+            <v-text-field v-if="selectedForm" v-model="formDetails.number" label="Número" :rules="[required]" />
+            <v-text-field v-if="selectedForm" v-model="formDetails.postal_code" label="CEP" :rules="[required]" />
             <v-select
-              v-model="form.media_type"
-              :items="registrationMediaTypeOptions"
-              label="Tipo de veículo"
-            />
-            <v-select
-              v-model="form.district"
+              v-model="editable.district"
               :items="DISTRICT_OPTIONS"
               label="Bairro"
             />
             <v-text-field
+              v-if="!selectedForm"
               v-model="form.address"
               label="Endereço completo"
               :rules="[required, minLength(3)]"
               class="span-2"
             />
             <v-text-field
-              v-model.number="form.latitude"
+              v-model.number="editable.latitude"
               label="Latitude"
               type="number"
               step="any"
               :rules="[coordinateRule(-20.65, -20.30, 'Latitude')]"
             />
             <v-text-field
-              v-model.number="form.longitude"
+              v-model.number="editable.longitude"
               label="Longitude"
               type="number"
               step="any"
               :rules="[coordinateRule(-54.80, -54.40, 'Longitude')]"
             />
+            <h4 class="form-section-title span-2">Veículo de comunicação</h4>
+            <v-select
+              v-model="editable.media_type"
+              :items="registrationMediaTypeOptions"
+              label="Tipo de veículo"
+            />
             <v-text-field
-              v-model.number="form.area_m2"
+              v-model.number="editable.area_m2"
               label="Área total (m²)"
               type="number"
               min="0.01"
@@ -183,7 +204,7 @@
               :rules="[nonNegative]"
             />
             <v-text-field
-              v-model.number="form.bottom_height_m"
+              v-model.number="editable.bottom_height_m"
               label="Borda inferior (m)"
               type="number"
             />
@@ -193,21 +214,15 @@
               type="number"
             />
             <v-text-field
-              v-model="form.expiration_date"
+              v-model="editable.expiration_date"
               label="Vencimento da autorização"
               type="date"
               hint="Opcional"
               persistent-hint
             />
-            <v-text-field
-              v-model="form.contact_name"
-              label="Contato do solicitante"
-            />
-            <v-text-field
-              v-model="form.contact_email"
-              label="E-mail do solicitante"
-              type="email"
-            />
+            <v-text-field v-if="selectedForm" v-model="formDetails.number_of_faces" label="Quantidade de faces" />
+            <v-text-field v-if="editingAsset" :model-value="`${calculatedRadius} m`" label="Raio calculado" readonly />
+            <h4 class="form-section-title span-2">Análise</h4>
             <v-text-field
               v-if="!editingId || form.status === 'novos processos'"
               model-value="Novos Processos"
@@ -228,6 +243,23 @@
               rows="3"
               class="span-2"
             />
+            <h4 v-if="editingId" class="form-section-title span-2">Anexos do formulário</h4>
+            <v-alert v-if="editingId && media.applicationFormsLoading" type="info" density="compact" variant="tonal" class="span-2">Carregando solicitação e anexos...</v-alert>
+            <v-alert v-if="editingId && media.applicationFormsError" type="warning" density="compact" variant="tonal" class="span-2">
+              {{ media.applicationFormsError }}
+              <v-btn variant="text" size="small" @click="media.loadApplicationFormsForMap(true)">Tentar novamente</v-btn>
+            </v-alert>
+            <div v-if="selectedForm?.attachments.length" class="form-attachment-list span-2">
+              <div v-for="attachment in selectedForm.attachments" :key="attachment.id" class="form-attachment-item">
+                <div>
+                  <strong>{{ attachment.original_filename }}</strong>
+                  <span>{{ attachmentCategoryLabel(attachment.category) }} · {{ attachment.content_type }}</span>
+                </div>
+                <v-btn size="small" variant="tonal" prepend-icon="mdi-open-in-new" @click="openUploadedAttachment(attachment)">Abrir</v-btn>
+              </div>
+            </div>
+            <div v-else-if="editingId && media.applicationFormsLoaded" class="attachment-link-empty span-2">Nenhum anexo enviado pelo formulário para este veículo.</div>
+            <h4 class="form-section-title span-2">Links adicionados manualmente</h4>
             <div class="attachment-crud span-2">
               <div class="attachment-crud-header">
                 <strong>Links de anexos</strong>
@@ -268,7 +300,11 @@
                   />
                 </div>
               </div>
-              <div v-else class="attachment-link-empty">Nenhum link adicionado ainda.</div>
+              <div v-else-if="!formManualLinks.length" class="attachment-link-empty">Nenhum link adicionado ainda.</div>
+              <div v-for="(link, index) in formManualLinks" :key="`form-${index}`" class="attachment-link-item">
+                <v-btn :href="link" target="_blank" rel="noopener noreferrer" variant="text" class="attachment-link-button">{{ link }}</v-btn>
+                <span>Do formulário</span>
+              </div>
             </div>
           </v-form>
         </v-card-text>
@@ -276,7 +312,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="media.saving" :disabled="!formValid" @click="save">Salvar Cadastro</v-btn>
+          <v-btn color="primary" :loading="media.saving" :disabled="!formValid || (Boolean(editingId) && !media.applicationFormsLoaded)" @click="save">Salvar Cadastro</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -298,7 +334,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import {
   DECISION_STATUS_OPTIONS,
@@ -313,8 +349,9 @@ import {
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
-import type { MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
-import { formatCoordinate, formatDate } from '../utils/format';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import { formatCoordinate, formatDate, formatDateTime } from '../utils/format';
+import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 
 defineEmits<{ 'view-map': [id: string] }>();
@@ -351,6 +388,15 @@ const statusFilterOptions = computed(() => [
 ]);
 
 const form = reactive<MediaAssetInput>(blankForm());
+const formDetails = reactive<ApplicationFormInput>(blankFormDetails());
+const editingAsset = computed(() => media.assets.find((asset) => asset.id === editingId.value) ?? null);
+const selectedForm = computed(() => media.applicationForms.find((item) => item.asset_id === editingId.value) ?? null);
+const editable = computed(() => selectedForm.value ? formDetails : form);
+const formManualLinks = computed(() => parseAttachmentLinks(selectedForm.value?.attachment_links).filter((link) => /^https?:\/\//i.test(link)));
+
+watch(selectedForm, (value) => {
+  if (value) Object.assign(formDetails, formDetailsFrom(value));
+});
 
 const deleteDialog = computed({
   get: () => Boolean(deleteTarget.value),
@@ -359,7 +405,7 @@ const deleteDialog = computed({
   },
 });
 
-const calculatedRadius = computed(() => getRequiredRadius(form.media_type, Number(form.area_m2 || 0), media.rules));
+const calculatedRadius = computed(() => getRequiredRadius(editable.value.media_type, Number(editable.value.area_m2 || 0), media.rules));
 
 const filteredAssets = computed(() => {
   const term = search.value.trim().toLowerCase();
@@ -368,7 +414,8 @@ const filteredAssets = computed(() => {
       !term ||
       asset.address.toLowerCase().includes(term) ||
       asset.district.toLowerCase().includes(term) ||
-      asset.process_code.toLowerCase().includes(term);
+      asset.process_code.toLowerCase().includes(term) ||
+      (asset.official_process_code ?? '').toLowerCase().includes(term);
 
     const matchesType = typeFilter.value === 'all' || asset.media_type === typeFilter.value;
     const matchesStatus = statusFilter.value === 'all' || asset.status === statusFilter.value;
@@ -380,6 +427,7 @@ const filteredAssets = computed(() => {
 function blankForm(): MediaAssetInput {
   return {
     media_type: 'outdoor',
+    official_process_code: null,
     address: '',
     district: 'Centro',
     latitude: -20.464,
@@ -394,6 +442,37 @@ function blankForm(): MediaAssetInput {
     attachment_links: '',
     contact_name: '',
     contact_email: '',
+  };
+}
+
+function blankFormDetails(): ApplicationFormInput {
+  return {
+    company_responsible: '', company_cnpj: null, municipal_registration: '', property_registration: '',
+    street: '', number: '', district: 'Centro', postal_code: '', latitude: -20.464, longitude: -54.612,
+    media_type: 'outdoor', area_m2: 27, bottom_height_m: 5, number_of_faces: null,
+    expiration_date: null, requester_email: '', attachment_links: null,
+  };
+}
+
+function formDetailsFrom(value: ApplicationForm): ApplicationFormInput {
+  return {
+    company_responsible: value.company_responsible,
+    company_cnpj: value.company_cnpj,
+    municipal_registration: value.municipal_registration,
+    property_registration: value.property_registration,
+    street: value.street,
+    number: value.number,
+    district: value.district,
+    postal_code: value.postal_code,
+    latitude: value.latitude,
+    longitude: value.longitude,
+    media_type: value.media_type,
+    area_m2: value.area_m2,
+    bottom_height_m: value.bottom_height_m,
+    number_of_faces: value.number_of_faces,
+    expiration_date: value.expiration_date,
+    requester_email: value.requester_email,
+    attachment_links: value.attachment_links,
   };
 }
 
@@ -438,6 +517,7 @@ function openCreateDialog() {
 function openEditDialog(asset: MediaAsset) {
   editingId.value = asset.id;
   Object.assign(form, {
+    official_process_code: asset.official_process_code ?? null,
     media_type: asset.media_type,
     address: asset.address,
     district: asset.district,
@@ -456,14 +536,53 @@ function openEditDialog(asset: MediaAsset) {
   });
   resetAttachmentLinks(asset.attachment_links);
   dialog.value = true;
+  void media.loadApplicationFormsForMap(true);
+}
+
+async function openUploadedAttachment(attachment: ApplicationFormAttachment) {
+  if (!selectedForm.value) return;
+  try {
+    await openApplicationFormAttachment(selectedForm.value.id, attachment.id);
+  } catch (error) {
+    media.error = error instanceof Error ? error.message : 'Falha ao abrir o anexo.';
+  }
 }
 
 async function save() {
-  if (!formValid.value || !form.address.trim()) return;
+  if (!formValid.value || (!selectedForm.value && !form.address.trim())) return;
+  if (editingId.value && !media.applicationFormsLoaded) return;
 
   try {
     if (editingId.value) {
-      await media.updateAsset(editingId.value, sanitizeForm());
+      if (selectedForm.value) {
+        const formPayload = {
+          ...formDetailsFrom(selectedForm.value),
+          ...formDetails,
+          company_cnpj: formDetails.company_cnpj || null,
+          number_of_faces: formDetails.number_of_faces || null,
+          expiration_date: formDetails.expiration_date || null,
+        };
+        const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
+          ([key, value]) => value !== selectedForm.value?.[key as keyof ApplicationForm],
+        )) as Partial<ApplicationFormInput>;
+        const assetPayload = {
+          official_process_code: form.official_process_code?.trim() || null,
+          width_m: form.width_m || null,
+          top_height_m: form.top_height_m || null,
+          status: form.status,
+          justification: form.justification || null,
+          contact_name: form.contact_name || null,
+          attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
+        };
+        const assetChanges = Object.fromEntries(Object.entries(assetPayload).filter(
+          ([key, value]) => value !== editingAsset.value?.[key as keyof MediaAsset],
+        )) as Partial<MediaAssetInput>;
+        if (Object.keys(formChanges).length || Object.keys(assetChanges).length) {
+          await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
+        }
+      } else {
+        await media.updateAsset(editingId.value, sanitizeForm());
+      }
     } else {
       await media.createAsset(sanitizeForm());
     }
