@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { api } from '../services/api';
-import type { ActivityLog, ApplicationForm, ConflictAnalysis, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
+import type { ActivityLog, ApplicationForm, ApplicationFormInput, ConflictAnalysis, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
 
 const EMPTY_STATS: MediaStats = {
   total: 0,
@@ -131,6 +131,36 @@ export const useMediaStore = defineStore('media', {
         return updated;
       } catch (error) {
         this.error = messageFrom(error, 'Falha ao atualizar o ativo.');
+        throw error;
+      } finally {
+        this.saving = false;
+      }
+    },
+    async updateLinkedAsset(id: string, formId: string, formInput: Partial<ApplicationFormInput>, assetInput: Partial<MediaAssetInput>) {
+      this.saving = true;
+      this.error = null;
+      try {
+        if (Object.keys(formInput).length) {
+          const form = await api.updateApplicationForm(formId, formInput);
+          const formIndex = this.applicationForms.findIndex((item) => item.id === formId);
+          if (formIndex >= 0) this.applicationForms[formIndex] = form;
+        }
+        if (Object.keys(assetInput).length) await api.updateMediaAsset(id, assetInput);
+        const asset = await api.getMediaAsset(id);
+        const assetIndex = this.assets.findIndex((item) => item.id === id);
+        if (assetIndex >= 0) this.assets[assetIndex] = asset;
+        await this.refreshMeta();
+        if (this.selectedAssetId === id && asset.status !== 'novos processos') await this.analyzeAsset(id);
+        return asset;
+      } catch (error) {
+        // The form and asset endpoints commit separately; reload both after a partial save.
+        const [asset, form] = await Promise.allSettled([api.getMediaAsset(id), api.listApplicationForms()]);
+        if (asset.status === 'fulfilled') {
+          const index = this.assets.findIndex((item) => item.id === id);
+          if (index >= 0) this.assets[index] = asset.value;
+        }
+        if (form.status === 'fulfilled') this.applicationForms = form.value;
+        this.error = messageFrom(error, 'Falha ao atualizar o cadastro.');
         throw error;
       } finally {
         this.saving = false;

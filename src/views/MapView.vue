@@ -82,7 +82,7 @@
         <template v-if="selectedAsset">
           <div class="analysis-card-header selected-header">
             <div>
-              <v-chip size="small" color="primary" variant="tonal" class="process-code">{{ selectedAsset.process_code }}</v-chip>
+              <v-chip size="small" color="primary" variant="tonal" class="process-code">{{ selectedAsset.official_process_code || selectedAsset.process_code }}</v-chip>
               <h3>{{ selectedAsset.address }}</h3>
               <span>{{ selectedAsset.district }} · {{ mediaTypeLabel(selectedAsset.media_type) }}</span>
             </div>
@@ -97,7 +97,8 @@
           <div ref="detailScrollElement" class="analysis-card-body">
           <h4 class="detail-section-title">Dados do processo</h4>
           <div class="spec-grid">
-            <div><span>Protocolo</span><strong class="process-code">{{ selectedAsset.process_code }}</strong></div>
+            <div><span>{{ selectedAsset.official_process_code ? 'Processo oficial' : 'Protocolo' }}</span><strong class="process-code">{{ selectedAsset.official_process_code || selectedAsset.process_code }}</strong></div>
+            <div v-if="selectedAsset.official_process_code"><span>Protocolo de origem</span><strong class="process-code">{{ selectedAsset.process_code }}</strong></div>
             <div><span>Status</span><strong>{{ statusLabel(selectedAsset.status) }}</strong></div>
             <div><span>Criado em</span><strong>{{ formatDateTime(selectedAsset.created_at) }}</strong></div>
             <div><span>Atualizado em</span><strong>{{ formatDateTime(selectedAsset.updated_at) }}</strong></div>
@@ -636,11 +637,11 @@ function renderAssets() {
       fillColor: color,
       fillOpacity: 1,
     })
-      .bindTooltip(`${asset.process_code} · ${mediaTypeLabel(asset.media_type)}`)
+      .bindTooltip(`${asset.official_process_code || asset.process_code} · ${mediaTypeLabel(asset.media_type)}`)
       .on('click', (event) => selectMapAsset(asset.id, event))
       .addTo(assetLayer!);
 
-    radiusCircle.bindTooltip(`${asset.process_code} · clique para ver detalhes`);
+    radiusCircle.bindTooltip(`${asset.official_process_code || asset.process_code} · clique para ver detalhes`);
     pointMarker.bringToFront();
   });
 }

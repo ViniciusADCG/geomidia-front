@@ -9,6 +9,11 @@ vi.mock('../services/api', () => ({
   api: {
     listApplicationForms: vi.fn(),
     analyzeMediaAsset: vi.fn(),
+    updateApplicationForm: vi.fn(),
+    updateMediaAsset: vi.fn(),
+    getMediaAsset: vi.fn(),
+    listActivities: vi.fn(),
+    getMediaStats: vi.fn(),
   },
 }));
 
@@ -60,6 +65,54 @@ beforeEach(() => {
 });
 
 describe('detalhes do ativo selecionado no mapa', () => {
+  it('mantém o cadastro manual editável e atualiza o ativo selecionado no mapa', async () => {
+    const store = useMediaStore();
+    store.assets = [asset('manual')];
+    const updatedAsset = { ...asset('manual'), address: 'Rua Nova, 20', official_process_code: '54321/2026' };
+    vi.mocked(api.updateMediaAsset).mockResolvedValue(updatedAsset);
+    vi.mocked(api.listActivities).mockResolvedValue({ items: [], total: 0, limit: 30, offset: 0 });
+    vi.mocked(api.getMediaStats).mockResolvedValue({
+      total: 1, new_processes: 1, pending: 0, approved: 0, rejected: 0,
+      expiring_soon: 0, expired: 0, by_type: {},
+    });
+    store.selectAsset('manual');
+
+    await store.updateAsset('manual', { address: 'Rua Nova, 20', official_process_code: '54321/2026' });
+
+    expect(store.selectedAsset?.address).toBe('Rua Nova, 20');
+    expect(store.selectedAsset?.official_process_code).toBe('54321/2026');
+    expect(store.selectedApplicationForm).toBeNull();
+  });
+
+  it('atualiza formulário e veículo no mesmo store após salvar protocolo oficial', async () => {
+    const store = useMediaStore();
+    store.assets = [asset('forms')];
+    store.applicationForms = [form('forms')];
+    const updatedForm = form('forms', { company_responsible: 'Empresa Atualizada' });
+    const updatedAsset = {
+      ...asset('forms'), company_responsible: 'Empresa Atualizada',
+      official_process_code: '12345/2026',
+    };
+    vi.mocked(api.updateApplicationForm).mockResolvedValue(updatedForm);
+    vi.mocked(api.updateMediaAsset).mockResolvedValue(updatedAsset);
+    vi.mocked(api.getMediaAsset).mockResolvedValue(updatedAsset);
+    vi.mocked(api.listActivities).mockResolvedValue({ items: [], total: 0, limit: 30, offset: 0 });
+    vi.mocked(api.getMediaStats).mockResolvedValue({
+      total: 1, new_processes: 1, pending: 0, approved: 0, rejected: 0,
+      expiring_soon: 0, expired: 0, by_type: {},
+    });
+
+    await store.updateLinkedAsset('forms', 'form-forms', {
+      company_responsible: 'Empresa Atualizada',
+    }, { official_process_code: '12345/2026' });
+
+    expect(api.updateApplicationForm).toHaveBeenCalledWith('form-forms', { company_responsible: 'Empresa Atualizada' });
+    expect(api.updateMediaAsset).toHaveBeenCalledWith('forms', { official_process_code: '12345/2026' });
+    expect(store.assets[0].process_code).toBe('PROC-forms');
+    expect(store.assets[0].official_process_code).toBe('12345/2026');
+    expect(store.applicationForms[0].company_responsible).toBe('Empresa Atualizada');
+  });
+
   it('associa o formulário e os anexos ao ativo vindo do FORMS GEO', async () => {
     const store = useMediaStore();
     store.assets = [asset('forms')];

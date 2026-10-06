@@ -67,6 +67,7 @@ export interface LoginResponse {
 export interface MediaAsset {
   id: string;
   process_code: string;
+  official_process_code?: string | null;
   media_type: MediaType;
   address: string;
   district: string;
