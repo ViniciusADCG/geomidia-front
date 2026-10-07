@@ -434,19 +434,24 @@ export const DISTRICT_OPTIONS = [
   'Vivendas do Parque',
 ]
 
-export function getRequiredRadius(mediaType: MediaType, areaM2: number, rules: MediaRule[] = []): number {
+export function getRequiredRadius(
+  mediaType: MediaType,
+  areaM2: number | null,
+  rules: MediaRule[] = [],
+  classification?: 'within_limit' | 'above_limit' | null,
+): number {
   const managedRule = rules.find((rule) => rule.media_type === mediaType && rule.is_active);
   if (managedRule) {
     if (
       managedRule.area_threshold_m2 != null
       && managedRule.radius_above_threshold_meters != null
-      && areaM2 > managedRule.area_threshold_m2
+      && (areaM2 != null ? areaM2 > managedRule.area_threshold_m2 : classification === 'above_limit')
     ) {
       return managedRule.radius_above_threshold_meters;
     }
     return managedRule.base_radius_meters;
   }
-  if (mediaType === 'painel de led') return areaM2 > 5 ? 1000 : 250;
+  if (mediaType === 'painel de led') return (areaM2 != null ? areaM2 > 5 : classification === 'above_limit') ? 1000 : 250;
   if (mediaType === 'painel eletronico modular' || mediaType === 'empena de led') return 1000;
   return 80;
 }

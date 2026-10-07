@@ -184,20 +184,6 @@
               persistent-hint
             />
             <v-text-field
-              v-model.number="form.area_m2"
-              label="Área do veículo (m²)"
-              type="number"
-              min="0.01"
-              :rules="[positive]"
-            />
-            <v-text-field
-              v-model.number="form.bottom_height_m"
-              label="Altura da borda inferior (m)"
-              type="number"
-              min="0"
-              :rules="[nonNegative]"
-            />
-            <v-text-field
               v-model="form.expiration_date"
               label="Vencimento da autorização"
               type="date"
@@ -337,8 +323,6 @@ const uploadedAttachments = ref<ApplicationFormAttachment[]>([]);
 const form = reactive<ApplicationFormInput>(blankForm());
 
 const required = (value: string) => Boolean(String(value ?? '').trim()) || 'Campo obrigatório.';
-const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior que zero.';
-const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
 const emailRule = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'E-mail inválido.';
 const postalCodeRule = (value: string) => /^\d{5}-?\d{3}$/.test(value) || 'Informe um CEP válido.';
 const optionalCnpjRule = (value: string | null | undefined) => {
@@ -350,7 +334,7 @@ const coordinateRule = (min: number, max: number, label: string) => (value: numb
 );
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
-const calculatedRadius = computed(() => getRequiredRadius(form.media_type, Number(form.area_m2 || 0), media.rules));
+const calculatedRadius = computed(() => getRequiredRadius(form.media_type, form.area_m2, media.rules, form.area_rule_classification));
 const filteredForms = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('pt-BR');
   if (!term) return forms.value;
@@ -380,8 +364,9 @@ function blankForm(): ApplicationFormInput {
     district: 'Centro',
     postal_code: '',
     media_type: 'outdoor',
-    area_m2: 1,
-    bottom_height_m: 0,
+    area_m2: null,
+    area_rule_classification: null,
+    bottom_height_m: null,
     number_of_faces: null,
     expiration_date: null,
     requester_email: '',
@@ -412,6 +397,7 @@ function openEdit(item: ApplicationForm) {
     postal_code: item.postal_code,
     media_type: item.media_type,
     area_m2: item.area_m2,
+    area_rule_classification: item.area_rule_classification,
     bottom_height_m: item.bottom_height_m,
     number_of_faces: item.number_of_faces ?? null,
     expiration_date: item.expiration_date ?? null,
@@ -480,8 +466,6 @@ function sanitizeForm(): ApplicationFormInput {
     number: form.number.trim(),
     postal_code: form.postal_code.trim(),
     requester_email: form.requester_email.trim(),
-    area_m2: Number(form.area_m2),
-    bottom_height_m: Number(form.bottom_height_m),
     number_of_faces: form.number_of_faces?.trim() || null,
     expiration_date: form.expiration_date || null,
     latitude: Number(form.latitude),
@@ -494,7 +478,10 @@ async function save() {
   if (!formValid.value || !editingId.value) return;
   saving.value = true;
   try {
-    await api.updateApplicationForm(editingId.value, sanitizeForm());
+    const changes = Object.fromEntries(Object.entries(sanitizeForm()).filter(
+      ([key]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key),
+    )) as Partial<ApplicationFormInput>;
+    await api.updateApplicationForm(editingId.value, changes);
     showMessage('Solicitação e ponto atualizados com sucesso.', 'success');
     await Promise.all([loadForms(), media.loadAll()]);
     dialog.value = false;
