@@ -58,10 +58,13 @@
           <v-select v-model="draft.media_type" :items="registrationMediaTypeOptions" label="Tipo" />
           <v-text-field v-model="draft.address" label="Endereço" :rules="[required]" />
           <v-select v-model="draft.district" :items="DISTRICT_OPTIONS" label="Bairro" />
-          <div class="two-cols">
-            <v-text-field v-model.number="draft.area_m2" label="Área (m²)" type="number" min="0.01" :rules="[positive]" />
-            <v-text-field v-model.number="draft.bottom_height_m" label="Altura (m)" type="number" min="0" :rules="[nonNegative]" />
-          </div>
+          <v-select
+            v-if="draftAreaThreshold != null"
+            v-model="draft.area_rule_classification"
+            :label="`O painel possui área superior ao limite de ${draftAreaThreshold} m²?`"
+            :items="[{ title: 'Não', value: 'within_limit' }, { title: 'Sim', value: 'above_limit' }]"
+            :rules="[required]"
+          />
           <v-text-field
             v-model="draft.expiration_date"
             label="Vencimento da autorização"
@@ -69,8 +72,8 @@
             hint="Opcional"
             persistent-hint
           />
-          <v-alert color="primary" variant="tonal" density="compact">
-            Raio calculado: {{ getRequiredRadius(draft.media_type, draft.area_m2, media.rules) }}m
+          <v-alert v-if="draftAreaThreshold == null || draft.area_rule_classification" color="primary" variant="tonal" density="compact">
+            Raio calculado: {{ getRequiredRadius(draft.media_type, draft.area_m2, media.rules, draft.area_rule_classification) }}m
           </v-alert>
           <v-btn color="primary" type="submit" block :loading="media.saving" :disabled="!draftValid">
             Adicionar e Mapear
@@ -180,14 +183,6 @@
           <div class="spec-grid">
             <div><span>Tipo</span><strong>{{ mediaTypeLabel(selectedAsset.media_type) }}</strong></div>
             <div v-if="selectedForm?.number_of_faces"><span>Quantidade de faces</span><strong>{{ selectedForm.number_of_faces }}</strong></div>
-            <div>
-              <span>Área</span>
-              <strong>{{ selectedAsset.area_m2 }} m²</strong>
-            </div>
-            <div>
-              <span>Altura</span>
-              <strong>{{ selectedAsset.bottom_height_m }} m</strong>
-            </div>
             <div v-if="selectedAsset.width_m != null">
               <span>Largura</span>
               <strong>{{ selectedAsset.width_m }} m</strong>
@@ -382,8 +377,6 @@ const draft = reactive<MediaAssetInput>(blankDraft());
 const draftValid = ref(false);
 const confirmDelete = ref(false);
 const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
-const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior que zero.';
-const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
 
 let map: L.Map | null = null;
 let assetLayer: L.LayerGroup | null = null;
@@ -418,6 +411,10 @@ const typeFilterOptions = computed(() => [
 ]);
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
+const draftAreaThreshold = computed(() => media.rules.find(
+  (rule) => rule.media_type === draft.media_type && rule.is_active,
+)?.area_threshold_m2 ?? null);
+watch(() => draft.media_type, () => { draft.area_rule_classification = null; });
 
 const statusFilterOptions = computed(() => [
   { title: 'Todos os status', value: 'all' },
@@ -566,9 +563,10 @@ function blankDraft(): MediaAssetInput {
     district: 'Centro',
     latitude: CAMPO_GRANDE_CENTER[0],
     longitude: CAMPO_GRANDE_CENTER[1],
-    area_m2: 27,
+    area_m2: null,
+    area_rule_classification: null,
     width_m: 9,
-    bottom_height_m: 5,
+    bottom_height_m: null,
     top_height_m: null,
     expiration_date: null,
     status: 'novos processos',

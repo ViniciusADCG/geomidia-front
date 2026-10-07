@@ -73,9 +73,10 @@ export interface MediaAsset {
   district: string;
   latitude: number;
   longitude: number;
-  area_m2: number;
+  area_m2: number | null;
+  area_rule_classification?: 'within_limit' | 'above_limit' | null;
   width_m?: number | null;
-  bottom_height_m: number;
+  bottom_height_m: number | null;
   top_height_m?: number | null;
   expiration_date?: string | null;
   radius_meters: number;
@@ -117,8 +118,9 @@ export interface ApplicationForm {
   district: string;
   postal_code: string;
   media_type: MediaType;
-  area_m2: number;
-  bottom_height_m: number;
+  area_m2: number | null;
+  area_rule_classification?: 'within_limit' | 'above_limit' | null;
+  bottom_height_m: number | null;
   number_of_faces?: string | null;
   expiration_date?: string | null;
   requester_email: string;

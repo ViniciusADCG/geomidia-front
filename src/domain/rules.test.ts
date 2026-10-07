@@ -15,6 +15,15 @@ describe('regras territoriais apresentadas no frontend', () => {
   it('calcula os limites do painel eletrônico modular de pequeno porte', () => {
     expect(getRequiredRadius('painel de led', 5)).toBe(250);
     expect(getRequiredRadius('painel de led', 5.01)).toBe(1000);
+    expect(getRequiredRadius('painel de led', null, [], 'within_limit')).toBe(250);
+    expect(getRequiredRadius('painel de led', null, [], 'above_limit')).toBe(1000);
+    const configured = [{
+      id: 'small-panel', media_type: 'painel de led' as const, name: 'Pequeno Porte',
+      base_radius_meters: 300, area_threshold_m2: 8, radius_above_threshold_meters: 900,
+      is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }] satisfies MediaRule[];
+    expect(getRequiredRadius('painel de led', null, configured, 'within_limit')).toBe(300);
+    expect(getRequiredRadius('painel de led', null, configured, 'above_limit')).toBe(900);
   });
 
   it('aplica raio fixo ao painel eletrônico modular', () => {
