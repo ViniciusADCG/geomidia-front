@@ -189,12 +189,12 @@
               :items="registrationMediaTypeOptions"
               label="Tipo de veículo"
             />
-            <v-text-field
-              v-model.number="editable.area_m2"
-              label="Área total (m²)"
-              type="number"
-              min="0.01"
-              :rules="[positive]"
+            <v-select
+              v-if="!editingId && formAreaThreshold != null"
+              v-model="form.area_rule_classification"
+              :label="`O painel possui área superior ao limite de ${formAreaThreshold} m²?`"
+              :items="[{ title: 'Não', value: 'within_limit' }, { title: 'Sim', value: 'above_limit' }]"
+              :rules="[required]"
             />
             <v-text-field
               v-model.number="form.width_m"
@@ -202,11 +202,6 @@
               type="number"
               min="0"
               :rules="[nonNegative]"
-            />
-            <v-text-field
-              v-model.number="editable.bottom_height_m"
-              label="Borda inferior (m)"
-              type="number"
             />
             <v-text-field
               v-model.number="form.top_height_m"
@@ -369,7 +364,6 @@ const attachmentLinkDraft = ref('');
 const attachmentLinks = ref<string[]>([]);
 const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
 const minLength = (length: number) => (value: string) => value.trim().length >= length || `Mínimo de ${length} caracteres.`;
-const positive = (value: number) => Number(value) > 0 || 'Informe um valor maior que zero.';
 const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
 const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
   (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
@@ -388,6 +382,12 @@ const statusFilterOptions = computed(() => [
 ]);
 
 const form = reactive<MediaAssetInput>(blankForm());
+const formAreaThreshold = computed(() => media.rules.find(
+  (rule) => rule.media_type === form.media_type && rule.is_active,
+)?.area_threshold_m2 ?? null);
+watch(() => form.media_type, () => {
+  if (!editingId.value) form.area_rule_classification = null;
+});
 const formDetails = reactive<ApplicationFormInput>(blankFormDetails());
 const editingAsset = computed(() => media.assets.find((asset) => asset.id === editingId.value) ?? null);
 const selectedForm = computed(() => media.applicationForms.find((item) => item.asset_id === editingId.value) ?? null);
@@ -405,7 +405,9 @@ const deleteDialog = computed({
   },
 });
 
-const calculatedRadius = computed(() => getRequiredRadius(editable.value.media_type, Number(editable.value.area_m2 || 0), media.rules));
+const calculatedRadius = computed(() => getRequiredRadius(
+  editable.value.media_type, editable.value.area_m2, media.rules, editable.value.area_rule_classification,
+));
 
 const filteredAssets = computed(() => {
   const term = search.value.trim().toLowerCase();
@@ -432,9 +434,10 @@ function blankForm(): MediaAssetInput {
     district: 'Centro',
     latitude: -20.464,
     longitude: -54.612,
-    area_m2: 27,
+    area_m2: null,
+    area_rule_classification: null,
     width_m: 9,
-    bottom_height_m: 5,
+    bottom_height_m: null,
     top_height_m: null,
     expiration_date: null,
     status: 'novos processos',
@@ -449,7 +452,7 @@ function blankFormDetails(): ApplicationFormInput {
   return {
     company_responsible: '', company_cnpj: null, municipal_registration: '', property_registration: '',
     street: '', number: '', district: 'Centro', postal_code: '', latitude: -20.464, longitude: -54.612,
-    media_type: 'outdoor', area_m2: 27, bottom_height_m: 5, number_of_faces: null,
+    media_type: 'outdoor', area_m2: null, area_rule_classification: null, bottom_height_m: null, number_of_faces: null,
     expiration_date: null, requester_email: '', attachment_links: null,
   };
 }
@@ -468,6 +471,7 @@ function formDetailsFrom(value: ApplicationForm): ApplicationFormInput {
     longitude: value.longitude,
     media_type: value.media_type,
     area_m2: value.area_m2,
+    area_rule_classification: value.area_rule_classification,
     bottom_height_m: value.bottom_height_m,
     number_of_faces: value.number_of_faces,
     expiration_date: value.expiration_date,
@@ -524,6 +528,7 @@ function openEditDialog(asset: MediaAsset) {
     latitude: asset.latitude,
     longitude: asset.longitude,
     area_m2: asset.area_m2,
+    area_rule_classification: asset.area_rule_classification ?? null,
     width_m: asset.width_m ?? null,
     bottom_height_m: asset.bottom_height_m,
     top_height_m: asset.top_height_m ?? null,
@@ -563,7 +568,7 @@ async function save() {
           expiration_date: formDetails.expiration_date || null,
         };
         const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
-          ([key, value]) => value !== selectedForm.value?.[key as keyof ApplicationForm],
+          ([key, value]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
         )) as Partial<ApplicationFormInput>;
         const assetPayload = {
           official_process_code: form.official_process_code?.trim() || null,
@@ -581,7 +586,10 @@ async function save() {
           await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
         }
       } else {
-        await media.updateAsset(editingId.value, sanitizeForm());
+        const changes = Object.fromEntries(Object.entries(sanitizeForm()).filter(
+          ([key]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key),
+        )) as Partial<MediaAssetInput>;
+        await media.updateAsset(editingId.value, changes);
       }
     } else {
       await media.createAsset(sanitizeForm());
