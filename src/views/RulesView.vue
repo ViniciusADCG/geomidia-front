@@ -250,7 +250,7 @@ async function save() {
       await api.createMediaRule(payload);
     }
     await loadRules();
-    await media.loadAll();
+    await media.loadAll(true);
     dialog.value = false;
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : 'Falha ao salvar a regra.';
