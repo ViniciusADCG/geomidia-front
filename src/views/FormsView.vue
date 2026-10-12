@@ -483,7 +483,7 @@ async function save() {
     )) as Partial<ApplicationFormInput>;
     await api.updateApplicationForm(editingId.value, changes);
     showMessage('Solicitação e ponto atualizados com sucesso.', 'success');
-    await Promise.all([loadForms(), media.loadAll()]);
+    await Promise.all([loadForms(), media.loadAll(true)]);
     dialog.value = false;
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao salvar a solicitação.', 'error');
@@ -498,7 +498,7 @@ async function confirmDelete() {
   try {
     await api.deleteApplicationForm(deleteTarget.value.id);
     deleteTarget.value = null;
-    await Promise.all([loadForms(), media.loadAll()]);
+    await Promise.all([loadForms(), media.loadAll(true)]);
     showMessage('Solicitação e ponto removidos do sistema.', 'success');
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir a solicitação.', 'error');
