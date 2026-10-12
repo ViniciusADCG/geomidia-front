@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 
@@ -137,12 +137,20 @@ const navItems = computed(() => [
 
 const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista GeoMídia', viewer: 'Consulta' }[auth.role ?? 'viewer']));
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('geomidia:unauthorized', handleUnauthorized);
-  if (!route.meta.public && !isVisualPreview() && await auth.validateSession()) {
-    await media.loadAll().catch(() => undefined);
-  }
 });
+
+watch(
+  () => route.meta.public,
+  async (isPublic) => {
+    if (isPublic || isVisualPreview() || !auth.isAuthenticated) return;
+    if (await auth.validateSession()) {
+      await media.loadAll().catch(() => undefined);
+    }
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
 
