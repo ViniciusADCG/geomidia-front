@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 import { api } from '../services/api';
-import type { ApplicationForm, MediaAsset } from '../types';
+import type { ActivityLog, ApplicationForm, MediaAsset, MediaRule, MediaStats, Page } from '../types';
 import { useMediaStore } from './media';
 
 vi.mock('../services/api', () => ({
@@ -12,8 +12,10 @@ vi.mock('../services/api', () => ({
     updateApplicationForm: vi.fn(),
     updateMediaAsset: vi.fn(),
     getMediaAsset: vi.fn(),
+    listMediaAssets: vi.fn(),
     listActivities: vi.fn(),
     getMediaStats: vi.fn(),
+    listMediaRules: vi.fn(),
   },
 }));
 
@@ -59,9 +61,177 @@ const form = (assetId: string, overrides: Partial<ApplicationForm> = {}): Applic
   ...overrides,
 });
 
+const activity = (id: string): ActivityLog => ({
+  id,
+  process_code: `PROC-${id}`,
+  activity_type: 'cadastro',
+  message: 'Cadastro realizado',
+  created_at: '2026-09-01T00:00:00Z',
+});
+
+const rule = (id: string): MediaRule => ({
+  id,
+  media_type: 'outdoor',
+  name: 'Outdoor',
+  base_radius_meters: 100,
+  is_active: true,
+  created_at: '2026-09-01T00:00:00Z',
+  updated_at: '2026-09-02T00:00:00Z',
+});
+
+const stats = (total: number): MediaStats => ({
+  total,
+  new_processes: total,
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+  expiring_soon: 0,
+  expired: 0,
+  by_type: {},
+});
+
+const page = (id: string): Page<MediaAsset> => ({ items: [asset(id)], total: 1, limit: 500, offset: 0 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function mockLoadAllSuccess() {
+  vi.mocked(api.listMediaAssets).mockResolvedValue(page('novo'));
+  vi.mocked(api.listActivities).mockResolvedValue({ items: [activity('nova')], total: 1, limit: 30, offset: 0 });
+  vi.mocked(api.getMediaStats).mockResolvedValue(stats(1));
+  vi.mocked(api.listMediaRules).mockResolvedValue([rule('nova')]);
+}
+
 beforeEach(() => {
   setActivePinia(createPinia());
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+});
+
+describe('carregamento global de mídia', () => {
+  it('reutiliza a carga em andamento para chamadas simultâneas equivalentes', async () => {
+    const store = useMediaStore();
+    const pending = deferred<Page<MediaAsset>>();
+    mockLoadAllSuccess();
+    vi.mocked(api.listMediaAssets).mockReturnValue(pending.promise);
+
+    const first = store.loadAll();
+    const second = store.loadAll();
+    expect(store.loading).toBe(true);
+    expect(api.listMediaAssets).toHaveBeenCalledTimes(1);
+    expect(api.listActivities).toHaveBeenCalledTimes(1);
+    expect(api.getMediaStats).toHaveBeenCalledTimes(1);
+    expect(api.listMediaRules).toHaveBeenCalledTimes(1);
+
+    pending.resolve(page('novo'));
+    await Promise.all([first, second]);
+    expect(store.loading).toBe(false);
+    expect(store.assets[0].id).toBe('novo');
+  });
+
+  it('aproveita três recursos bem-sucedidos quando um falha', async () => {
+    const store = useMediaStore();
+    mockLoadAllSuccess();
+    store.activities = [activity('anterior')];
+    vi.mocked(api.listActivities).mockRejectedValue(new Error('API indisponível'));
+
+    await expect(store.loadAll()).rejects.toThrow('atividades');
+    expect(store.assets[0].id).toBe('novo');
+    expect(store.stats.total).toBe(1);
+    expect(store.rules[0].id).toBe('nova');
+    expect(store.activities[0].id).toBe('anterior');
+    expect(store.error).toContain('API indisponível');
+    expect(store.loading).toBe(false);
+  });
+
+  it('preserva os dados anteriores quando uma atualização falha por completo', async () => {
+    const store = useMediaStore();
+    store.assets = [asset('anterior')];
+    store.assetTotal = 4;
+    store.activities = [activity('anterior')];
+    store.stats = stats(4);
+    store.rules = [rule('anterior')];
+    vi.mocked(api.listMediaAssets).mockRejectedValue(new Error('sem conexão'));
+    vi.mocked(api.listActivities).mockRejectedValue(new Error('sem conexão'));
+    vi.mocked(api.getMediaStats).mockRejectedValue(new Error('sem conexão'));
+    vi.mocked(api.listMediaRules).mockRejectedValue(new Error('sem conexão'));
+
+    await expect(store.loadAll()).rejects.toThrow('sem conexão');
+    expect(store.assets[0].id).toBe('anterior');
+    expect(store.assetTotal).toBe(4);
+    expect(store.activities[0].id).toBe('anterior');
+    expect(store.stats.total).toBe(4);
+    expect(store.rules[0].id).toBe('anterior');
+    expect(store.loading).toBe(false);
+  });
+
+  it('ignora uma resposta antiga que termina depois da carga forçada mais recente', async () => {
+    const store = useMediaStore();
+    const oldRequest = deferred<Page<MediaAsset>>();
+    mockLoadAllSuccess();
+    vi.mocked(api.listMediaAssets).mockReturnValueOnce(oldRequest.promise).mockResolvedValueOnce(page('recente'));
+
+    const oldLoad = store.loadAll();
+    await store.loadAll(true);
+    expect(store.assets[0].id).toBe('recente');
+
+    oldRequest.resolve(page('antigo'));
+    await oldLoad;
+    expect(store.assets[0].id).toBe('recente');
+    expect(store.loading).toBe(false);
+  });
+
+  it('mantém loading enquanto a carga mais recente ainda está pendente', async () => {
+    const store = useMediaStore();
+    const oldRequest = deferred<Page<MediaAsset>>();
+    const newRequest = deferred<Page<MediaAsset>>();
+    mockLoadAllSuccess();
+    vi.mocked(api.listMediaAssets).mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
+
+    const oldLoad = store.loadAll();
+    const newLoad = store.loadAll(true);
+    oldRequest.resolve(page('antigo'));
+    await oldLoad;
+    expect(store.loading).toBe(true);
+    expect(store.assets).toEqual([]);
+
+    newRequest.resolve(page('recente'));
+    await newLoad;
+    expect(store.loading).toBe(false);
+    expect(store.assets[0].id).toBe('recente');
+  });
+});
+
+describe('atualização de ApplicationForms', () => {
+  it('preserva formulários durante refresh com erro e permite tentar novamente', async () => {
+    const store = useMediaStore();
+    const pending = deferred<ApplicationForm[]>();
+    store.applicationForms = [form('anterior')];
+    store.applicationFormsLoaded = true;
+    vi.mocked(api.listApplicationForms).mockReturnValueOnce(pending.promise).mockResolvedValueOnce([form('recente')]);
+
+    const refresh = store.loadApplicationFormsForMap(true);
+    expect(store.applicationFormsLoading).toBe(true);
+    expect(store.applicationFormsLoaded).toBe(true);
+    expect(store.applicationForms[0].asset_id).toBe('anterior');
+    pending.reject(new Error('Falha na atualização'));
+    await refresh;
+    expect(store.applicationForms[0].asset_id).toBe('anterior');
+    expect(store.applicationFormsLoaded).toBe(true);
+    expect(store.applicationFormsError).toBe('Falha na atualização');
+    expect(store.applicationFormsLoading).toBe(false);
+
+    await store.loadApplicationFormsForMap();
+    expect(api.listApplicationForms).toHaveBeenCalledTimes(2);
+    expect(store.applicationForms[0].asset_id).toBe('recente');
+    expect(store.applicationFormsError).toBeNull();
+  });
 });
 
 describe('detalhes do ativo selecionado no mapa', () => {

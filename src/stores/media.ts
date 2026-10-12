@@ -36,6 +36,12 @@ function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function failureMessage(label: string, result: PromiseSettledResult<unknown>): string | null {
+  return result.status === 'rejected' ? `${label}: ${messageFrom(result.reason, 'Falha na requisição')}` : null;
+}
+
+const loadAllInFlight = new WeakMap<object, Promise<void>>();
+
 export const useMediaStore = defineStore('media', {
   state: (): MediaState => ({
     assets: [],
@@ -60,13 +66,9 @@ export const useMediaStore = defineStore('media', {
   },
   actions: {
     async loadApplicationFormsForMap(force = false) {
-      if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force)) return;
+      if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force && !this.applicationFormsError)) return;
       this.applicationFormsLoading = true;
       this.applicationFormsError = null;
-      if (force) {
-        this.applicationForms = [];
-        this.applicationFormsLoaded = false;
-      }
       try {
         this.applicationForms = await api.listApplicationForms();
         this.applicationFormsLoaded = true;
@@ -76,27 +78,49 @@ export const useMediaStore = defineStore('media', {
         this.applicationFormsLoading = false;
       }
     },
-    async loadAll() {
+    loadAll(force = false) {
+      const inFlight = loadAllInFlight.get(this);
+      if (inFlight && !force) return inFlight;
       this.loading = true;
       this.error = null;
-      try {
-        const [assetPage, activityPage, stats, rules] = await Promise.all([
-          api.listMediaAssets({ limit: 500 }),
-          api.listActivities(),
-          api.getMediaStats(),
-          api.listMediaRules(),
-        ]);
-        this.assets = assetPage.items;
-        this.assetTotal = assetPage.total;
-        this.activities = activityPage.items;
-        this.stats = stats;
-        this.rules = rules;
-      } catch (error) {
-        this.error = messageFrom(error, 'Falha ao carregar dados.');
+      const request = Promise.allSettled([
+        api.listMediaAssets({ limit: 500 }),
+        api.listActivities(),
+        api.getMediaStats(),
+        api.listMediaRules(),
+      ]).then(([assetPage, activityPage, stats, rules]) => {
+        if (loadAllInFlight.get(this) !== request) return;
+
+        if (assetPage.status === 'fulfilled') {
+          this.assets = assetPage.value.items;
+          this.assetTotal = assetPage.value.total;
+        }
+        if (activityPage.status === 'fulfilled') this.activities = activityPage.value.items;
+        if (stats.status === 'fulfilled') this.stats = stats.value;
+        if (rules.status === 'fulfilled') this.rules = rules.value;
+
+        const failures = [
+          failureMessage('veículos', assetPage),
+          failureMessage('atividades', activityPage),
+          failureMessage('estatísticas', stats),
+          failureMessage('regras', rules),
+        ].filter((message): message is string => message !== null);
+        if (failures.length) {
+          this.error = `Falha ao carregar ${failures.join('; ')}.`;
+          throw new Error(this.error);
+        }
+      }).catch((error: unknown) => {
+        if (loadAllInFlight.get(this) === request) {
+          this.error = messageFrom(error, 'Falha ao carregar dados.');
+        }
         throw error;
-      } finally {
+      }).finally(() => {
+        if (loadAllInFlight.get(this) !== request) return;
+        loadAllInFlight.delete(this);
         this.loading = false;
-      }
+      });
+      loadAllInFlight.set(this, request);
+      return request;
     },
     async refreshMeta() {
       const [activityPage, stats] = await Promise.all([api.listActivities(), api.getMediaStats()]);
