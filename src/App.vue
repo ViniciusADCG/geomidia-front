@@ -60,15 +60,15 @@
       <v-main class="app-main">
         <v-container fluid class="app-content">
           <v-alert
-            v-if="media.error"
+            v-if="auth.error || media.error"
             type="error"
             variant="tonal"
             density="compact"
             class="mb-4"
             closable
-            @click:close="media.error = null"
+            @click:close="auth.error = null; media.error = null"
           >
-            {{ media.error }}
+            {{ auth.error || media.error }}
           </v-alert>
 
           <router-view v-slot="{ Component }">
@@ -163,8 +163,9 @@ function handleViewOnMap(id: string) {
   void router.push({ name: 'map', query: { asset: id } });
 }
 
-function handleUnauthorized() {
+function handleUnauthorized(event: Event) {
   if (isVisualPreview()) return;
+  if ((event as CustomEvent<{ token: string | null }>).detail?.token !== auth.token) return;
   auth.logout();
   void router.push({ name: 'login' });
 }
@@ -173,7 +174,6 @@ function logout() {
   confirmLogout.value = false;
   exitVisualPreview();
   auth.logout();
-  media.$reset();
   void router.push({ name: 'login' });
 }
 </script>
