@@ -20,6 +20,7 @@ vi.mock('../services/api', async (importOriginal) => {
       getMediaStats: vi.fn(),
       listMediaRules: vi.fn(),
       listApplicationForms: vi.fn(),
+      getApplicationFormByAsset: vi.fn(),
     },
   };
 });
@@ -200,13 +201,13 @@ describe('ciclo de sessão', () => {
     await login();
     const auth = useAuthStore();
     const media = useMediaStore();
-    const pending = deferred<ApplicationForm[]>();
-    vi.mocked(api.listApplicationForms).mockReturnValueOnce(pending.promise);
+    const pending = deferred<ApplicationForm>();
+    vi.mocked(api.getApplicationFormByAsset).mockReturnValueOnce(pending.promise);
 
-    const oldLoad = media.loadApplicationFormsForMap();
+    const oldLoad = media.loadApplicationFormForInventory('sessao-A');
     auth.logout();
     await login('token-B');
-    pending.resolve([{ id: 'form-A' } as ApplicationForm]);
+    pending.resolve({ id: 'form-A' } as ApplicationForm);
     await oldLoad;
 
     expect(media.applicationForms).toEqual([]);

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 
-import { api } from '../services/api';
+import { ApiError, api } from '../services/api';
 import type { ActivityLog, ApplicationForm, ConflictAnalysis, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaRule, MediaStats, MediaStatus, MediaType, Page } from '../types';
 
 const EMPTY_STATS: MediaStats = {
@@ -56,6 +56,7 @@ const dashboardInFlight = new WeakMap<object, Promise<void>>();
 const rulesInFlight = new WeakMap<object, Promise<void>>();
 const sessionGeneration = new WeakMap<object, number>();
 const inventoryRequestVersion = new WeakMap<object, number>();
+const applicationFormRequestVersion = new WeakMap<object, number>();
 const inventorySearchTimer = new WeakMap<object, ReturnType<typeof setTimeout>>();
 
 function generation(store: object): number {
@@ -105,6 +106,7 @@ export const useMediaStore = defineStore('media', {
       clearTimeout(inventorySearchTimer.get(this));
       inventorySearchTimer.delete(this);
       inventoryRequestVersion.delete(this);
+      applicationFormRequestVersion.delete(this);
       this.$reset();
     },
     async loadInventory(): Promise<Page<MediaAsset> | null> {
@@ -193,21 +195,29 @@ export const useMediaStore = defineStore('media', {
       await this.reloadInventoryAfterMutation();
       return result;
     },
-    async loadApplicationFormsForMap(force = false) {
-      if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force && !this.applicationFormsError)) return;
+    async loadApplicationFormForInventory(assetId: string) {
       const session = generation(this);
+      const requestVersion = (applicationFormRequestVersion.get(this) ?? 0) + 1;
+      applicationFormRequestVersion.set(this, requestVersion);
+      const current = () => generation(this) === session && applicationFormRequestVersion.get(this) === requestVersion;
       this.applicationFormsLoading = true;
+      this.applicationFormsLoaded = false;
       this.applicationFormsError = null;
+      this.applicationForms = [];
       try {
-        const forms = await api.listApplicationForms();
-        if (generation(this) !== session) return;
-        this.applicationForms = forms;
+        const form = await api.getApplicationFormByAsset(assetId);
+        if (!current()) return;
+        this.applicationForms = [form];
         this.applicationFormsLoaded = true;
       } catch (error) {
-        if (generation(this) !== session) return;
+        if (!current()) return;
+        if (error instanceof ApiError && error.status === 404) {
+          this.applicationFormsLoaded = true;
+          return;
+        }
         this.applicationFormsError = messageFrom(error, 'Falha ao carregar os dados da solicitação.');
       } finally {
-        if (generation(this) === session) this.applicationFormsLoading = false;
+        if (current()) this.applicationFormsLoading = false;
       }
     },
     loadDashboard() {

@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
-import { api } from '../services/api';
+import { ApiError, api } from '../services/api';
 import type { ActivityLog, ApplicationForm, MediaAsset, MediaRule, MediaStats, Page } from '../types';
 import { useMediaStore } from './media';
 
-vi.mock('../services/api', () => ({
-  api: {
+vi.mock('../services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/api')>();
+  return { ApiError: actual.ApiError, api: {
     listApplicationForms: vi.fn(),
+    getApplicationFormByAsset: vi.fn(),
     analyzeMediaAsset: vi.fn(),
     updateApplicationForm: vi.fn(),
     updateLinkedApplicationForm: vi.fn(),
@@ -17,8 +19,8 @@ vi.mock('../services/api', () => ({
     listActivities: vi.fn(),
     getMediaStats: vi.fn(),
     listMediaRules: vi.fn(),
-  },
-}));
+  } };
+});
 
 const asset = (id: string): MediaAsset => ({
   id,
@@ -255,29 +257,46 @@ describe('carregamento global de mídia', () => {
   });
 });
 
-describe('atualização de ApplicationForms', () => {
-  it('preserva formulários durante refresh com erro e permite tentar novamente', async () => {
+describe('formulário do ativo editado no Inventário', () => {
+  it('busca apenas o formulário escolhido, mantém erro consistente e permite tentar novamente', async () => {
     const store = useMediaStore();
-    const pending = deferred<ApplicationForm[]>();
+    const pending = deferred<ApplicationForm>();
     store.applicationForms = [form('anterior')];
     store.applicationFormsLoaded = true;
-    vi.mocked(api.listApplicationForms).mockReturnValueOnce(pending.promise).mockResolvedValueOnce([form('recente')]);
+    vi.mocked(api.getApplicationFormByAsset).mockReturnValueOnce(pending.promise).mockResolvedValueOnce(form('recente'));
 
-    const refresh = store.loadApplicationFormsForMap(true);
+    const refresh = store.loadApplicationFormForInventory('recente');
     expect(store.applicationFormsLoading).toBe(true);
-    expect(store.applicationFormsLoaded).toBe(true);
-    expect(store.applicationForms[0].asset_id).toBe('anterior');
+    expect(store.applicationFormsLoaded).toBe(false);
+    expect(store.applicationForms).toEqual([]);
     pending.reject(new Error('Falha na atualização'));
     await refresh;
-    expect(store.applicationForms[0].asset_id).toBe('anterior');
-    expect(store.applicationFormsLoaded).toBe(true);
+    expect(store.applicationForms).toEqual([]);
+    expect(store.applicationFormsLoaded).toBe(false);
     expect(store.applicationFormsError).toBe('Falha na atualização');
     expect(store.applicationFormsLoading).toBe(false);
 
-    await store.loadApplicationFormsForMap();
-    expect(api.listApplicationForms).toHaveBeenCalledTimes(2);
+    await store.loadApplicationFormForInventory('recente');
+    expect(api.getApplicationFormByAsset).toHaveBeenCalledTimes(2);
+    expect(api.getApplicationFormByAsset).toHaveBeenCalledWith('recente');
+    expect(api.listApplicationForms).not.toHaveBeenCalled();
     expect(store.applicationForms[0].asset_id).toBe('recente');
+    expect(store.applicationFormsLoaded).toBe(true);
     expect(store.applicationFormsError).toBeNull();
+  });
+
+  it('trata 404 como ativo manual, mas não transforma 403 em formulário ausente', async () => {
+    const store = useMediaStore();
+    vi.mocked(api.getApplicationFormByAsset).mockRejectedValueOnce(new ApiError('Não encontrado', 404));
+    await store.loadApplicationFormForInventory('manual');
+    expect(store.applicationForms).toEqual([]);
+    expect(store.applicationFormsLoaded).toBe(true);
+    expect(store.applicationFormsError).toBeNull();
+
+    vi.mocked(api.getApplicationFormByAsset).mockRejectedValueOnce(new ApiError('Sem permissão', 403));
+    await store.loadApplicationFormForInventory('bloqueado');
+    expect(store.applicationFormsLoaded).toBe(false);
+    expect(store.applicationFormsError).toBe('Sem permissão');
   });
 });
 
@@ -382,10 +401,10 @@ describe('detalhes do ativo selecionado no mapa', () => {
       id: 'anexo-1', category: 'requerimentoPadrao', original_filename: 'requerimento.pdf',
       content_type: 'application/pdf', size_bytes: 1024, created_at: '2026-09-01T00:00:00Z',
     };
-    vi.mocked(api.listApplicationForms).mockResolvedValue([form('forms', { attachments: [attachment] })]);
+    vi.mocked(api.getApplicationFormByAsset).mockResolvedValue(form('forms', { attachments: [attachment] }));
 
     store.selectAsset('forms');
-    await store.loadApplicationFormsForMap();
+    await store.loadApplicationFormForInventory('forms');
 
     expect(store.selectedAsset?.id).toBe('forms');
     expect(store.selectedApplicationForm?.attachments).toEqual([attachment]);
@@ -394,10 +413,10 @@ describe('detalhes do ativo selecionado no mapa', () => {
   it('aceita formulário sem campos opcionais e ativo manual sem formulário', async () => {
     const store = useMediaStore();
     store.assets = [asset('forms'), asset('manual')];
-    vi.mocked(api.listApplicationForms).mockResolvedValue([
+    vi.mocked(api.getApplicationFormByAsset).mockResolvedValue(
       form('forms', { company_cnpj: null, number_of_faces: null, attachments: [] }),
-    ]);
-    await store.loadApplicationFormsForMap();
+    );
+    await store.loadApplicationFormForInventory('forms');
 
     store.selectAsset('forms');
     expect(store.selectedApplicationForm?.company_cnpj).toBeNull();
@@ -408,21 +427,23 @@ describe('detalhes do ativo selecionado no mapa', () => {
     expect(store.selectedApplicationForm).toBeNull();
   });
 
-  it('mantém o último marcador selecionado durante um carregamento pendente', async () => {
+  it('ignora resposta do formulário anterior quando outro ativo é aberto', async () => {
     const store = useMediaStore();
     store.assets = [asset('primeiro'), asset('segundo')];
-    let resolveForms!: (forms: ApplicationForm[]) => void;
-    vi.mocked(api.listApplicationForms).mockReturnValue(new Promise((resolve) => { resolveForms = resolve; }));
+    const previous = deferred<ApplicationForm>();
+    vi.mocked(api.getApplicationFormByAsset).mockReturnValueOnce(previous.promise).mockResolvedValueOnce(form('segundo'));
 
     store.selectAsset('primeiro');
-    const loading = store.loadApplicationFormsForMap();
+    const loading = store.loadApplicationFormForInventory('primeiro');
     store.selectAsset('segundo');
-    resolveForms([form('primeiro'), form('segundo')]);
+    await store.loadApplicationFormForInventory('segundo');
+    previous.resolve(form('primeiro'));
     await loading;
 
     expect(store.selectedAsset?.id).toBe('segundo');
     expect(store.selectedApplicationForm?.asset_id).toBe('segundo');
-    expect(api.listApplicationForms).toHaveBeenCalledTimes(1);
+    expect(store.applicationForms).toHaveLength(1);
+    expect(api.getApplicationFormByAsset).toHaveBeenCalledTimes(2);
   });
 
   it('usa a mesma seleção ao alternar entre Inventário e marcador e permite fechar', () => {

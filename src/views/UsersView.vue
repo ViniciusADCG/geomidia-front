@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -116,7 +116,11 @@ const form = reactive<UserInput & { is_active: boolean }>({
 const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
 const minLength = (length: number) => (value: string) => value.length >= length || `Mínimo de ${length} caracteres.`;
 
-onMounted(loadUsers);
+onMounted(() => {
+  window.addEventListener('geomidia:users-refresh', loadUsers);
+  void loadUsers();
+});
+onUnmounted(() => window.removeEventListener('geomidia:users-refresh', loadUsers));
 
 async function loadUsers() {
   try {
