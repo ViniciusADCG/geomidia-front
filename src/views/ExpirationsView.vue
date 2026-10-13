@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import ExpirationListCard from '../components/ExpirationListCard.vue';
@@ -73,7 +73,11 @@ const overview = ref<ExpirationOverview>({ ...EMPTY_OVERVIEW });
 const loading = ref(false);
 const error = ref('');
 
-onMounted(loadExpirations);
+onMounted(() => {
+  window.addEventListener('geomidia:expirations-refresh', loadExpirations);
+  void loadExpirations();
+});
+onUnmounted(() => window.removeEventListener('geomidia:expirations-refresh', loadExpirations));
 
 async function loadExpirations() {
   loading.value = true;

@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 import { api } from '../services/api';
 import type { Page, RequirementResponse } from '../types';
@@ -117,7 +117,11 @@ const error = ref('');
 const selected = ref<RequirementResponse | null>(null);
 const page = ref<Page<RequirementResponse>>({ items: [], total: 0, limit: 50, offset: 0 });
 
-onMounted(() => { void loadResponses(); });
+onMounted(() => {
+  window.addEventListener('geomidia:requirements-refresh', loadResponses);
+  void loadResponses();
+});
+onUnmounted(() => window.removeEventListener('geomidia:requirements-refresh', loadResponses));
 
 async function loadResponses() {
   loading.value = true;
