@@ -363,6 +363,7 @@ import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatu
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
 import { formatDate, formatDateTime } from '../utils/format';
+import { createMapAssetLayerRenderer } from '../utils/map-asset-layers';
 import { clusterZoom, createViewportScheduler, readMapViewport } from '../utils/map-viewport';
 
 const CAMPO_GRANDE_CENTER: [number, number] = [-20.464, -54.612];
@@ -391,6 +392,7 @@ const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatóri
 
 let map: L.Map | null = null;
 let assetLayer: L.LayerGroup | null = null;
+let assetLayerRenderer: ReturnType<typeof createMapAssetLayerRenderer> | null = null;
 let publicPropertiesLayer: L.GeoJSON | null = null;
 let publicPropertiesRenderer: L.Canvas | null = null;
 let publicPropertiesRequest: AbortController | null = null;
@@ -444,7 +446,6 @@ watch(companyFilterOptions, (options) => {
 });
 
 watch(() => mapState.selectedAssetId, async () => {
-  renderAssets();
   await nextTick();
   if (detailScrollElement.value) detailScrollElement.value.scrollTop = 0;
 });
@@ -490,6 +491,15 @@ onMounted(async () => {
   void loadPublicProperties();
 
   assetLayer = L.layerGroup().addTo(map);
+  assetLayerRenderer = createMapAssetLayerRenderer({
+    leaflet: L,
+    layer: assetLayer,
+    onAssetClick: selectMapAsset,
+    onClusterClick: (cluster, event) => {
+      event.originalEvent.stopPropagation();
+      map?.setView([cluster.latitude, cluster.longitude], clusterZoom(map?.getZoom() ?? 0));
+    },
+  });
   map.on('click', handleMapClick);
   map.on('moveend zoomend', scheduleViewportLoad);
   renderAssets();
@@ -509,6 +519,7 @@ onUnmounted(() => {
   map?.remove();
   map = null;
   assetLayer = null;
+  assetLayerRenderer = null;
   publicPropertiesLayer = null;
   publicPropertiesRenderer = null;
   publicPropertiesRequest = null;
@@ -639,55 +650,7 @@ function removeReviewAttachmentLink(index: number) {
 }
 
 function renderAssets() {
-  if (!assetLayer) return;
-  assetLayer.clearLayers();
-
-  if (mapState.tooMany) {
-    mapState.clusters.forEach((cluster) => {
-      const icon = L.divIcon({
-        className: 'map-cluster-icon',
-        html: `<span>${cluster.count}</span>`,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
-      });
-      L.marker([cluster.latitude, cluster.longitude], { icon, title: `${cluster.count} veículos nesta região` })
-        .on('click', (event) => {
-          event.originalEvent.stopPropagation();
-          map?.setView([cluster.latitude, cluster.longitude], clusterZoom(map?.getZoom() ?? 0));
-        })
-        .addTo(assetLayer!);
-    });
-    return;
-  }
-
-  mapState.items.forEach((asset) => {
-    const color = mediaTypeColor(asset.media_type);
-    const latLng: L.LatLngExpression = [asset.latitude, asset.longitude];
-
-    const radiusCircle = L.circle(latLng, {
-      radius: asset.radius_meters,
-      color: asset.id === mapState.selectedAssetId ? '#b42318' : color,
-      fillColor: color,
-      fillOpacity: asset.id === mapState.selectedAssetId ? 0.16 : 0.08,
-      weight: asset.id === mapState.selectedAssetId ? 2 : 1,
-    })
-      .on('click', (event) => selectMapAsset(asset.id, event))
-      .addTo(assetLayer!);
-
-    const pointMarker = L.circleMarker(latLng, {
-      radius: asset.id === mapState.selectedAssetId ? 9 : 7,
-      color: '#ffffff',
-      weight: 2,
-      fillColor: color,
-      fillOpacity: 1,
-    })
-      .bindTooltip(`${asset.official_process_code || asset.process_code} · ${mediaTypeLabel(asset.media_type)}`)
-      .on('click', (event) => selectMapAsset(asset.id, event))
-      .addTo(assetLayer!);
-
-    radiusCircle.bindTooltip(`${asset.official_process_code || asset.process_code} · clique para ver detalhes`);
-    pointMarker.bringToFront();
-  });
+  assetLayerRenderer?.render(mapState.items, mapState.clusters, mapState.tooMany, mapState.selectedAssetId);
 }
 
 function selectMapAsset(assetId: string, event: L.LeafletMouseEvent) {
@@ -704,12 +667,10 @@ function handleMapClick(event: L.LeafletMouseEvent) {
     address: `Ponto capturado (${event.latlng.lat.toFixed(4)}, ${event.latlng.lng.toFixed(4)})`,
   });
   void mapState.selectAsset(null, auth.canWrite);
-  renderAssets();
   mode.value = 'form';
 }
 
 function focusAsset(asset: MediaAsset) {
-  renderAssets();
   if (!map) return;
   map.setView([asset.latitude, asset.longitude], Math.max(map.getZoom(), 15), { animate: true });
 }
