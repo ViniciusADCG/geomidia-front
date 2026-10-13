@@ -153,6 +153,21 @@ export type ApplicationFormInput = Omit<
   'id' | 'asset_id' | 'process_code' | 'status' | 'attachments' | 'created_at' | 'updated_at'
 >;
 
+export interface LinkedApplicationFormUpdate {
+  form: Partial<Pick<ApplicationFormInput,
+    'company_responsible' | 'company_cnpj' | 'municipal_registration' | 'property_registration'
+    | 'street' | 'number' | 'district' | 'postal_code' | 'latitude' | 'longitude'
+    | 'media_type' | 'number_of_faces' | 'expiration_date' | 'requester_email'>>;
+  asset: Partial<Pick<MediaAssetInput,
+    'official_process_code' | 'width_m' | 'top_height_m' | 'status' | 'justification'
+    | 'contact_name' | 'attachment_links'>>;
+}
+
+export interface LinkedApplicationFormResult {
+  form: ApplicationForm;
+  asset: MediaAsset;
+}
+
 export interface ActivityLog {
   id: string;
   asset_id?: string | null;
