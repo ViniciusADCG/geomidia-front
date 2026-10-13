@@ -50,7 +50,7 @@
 
       <admin-topbar
         :show-menu="display.smAndDown.value"
-        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading)"
+        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading)"
         :role-label="roleLabel"
         :user-name="auth.userName"
         @toggle-menu="drawer = !drawer"
@@ -100,16 +100,20 @@ import { useDisplay } from 'vuetify';
 
 import AdminTopbar from './components/AdminTopbar.vue';
 import { exitVisualPreview, isVisualPreview } from './router';
+import { api } from './services/api';
 import { useAuthStore } from './stores/auth';
+import { useMapStore } from './stores/map';
 import { useMediaStore } from './stores/media';
 
 const auth = useAuthStore();
 const media = useMediaStore();
+const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
 const display = useDisplay();
 const drawer = ref(true);
 const confirmLogout = ref(false);
+let mapOnlyLoad = false;
 
 if (isVisualPreview()) {
   auth.role = 'admin';
@@ -146,11 +150,30 @@ watch(
   async (isPublic) => {
     if (isPublic || isVisualPreview() || !auth.isAuthenticated) return;
     if (await auth.validateSession()) {
-      await media.loadAll().catch(() => undefined);
+      if (route.name === 'map') {
+        mapOnlyLoad = true;
+        try {
+          media.rules = await api.listMediaRules();
+        } catch (error) {
+          media.error = error instanceof Error ? error.message : 'Falha ao carregar regras.';
+        }
+      } else {
+        await media.loadAll().catch(() => undefined);
+      }
     }
   },
   { immediate: true },
 );
+
+watch(() => route.name, (name) => {
+  if (name === 'map' || !mapOnlyLoad || !auth.isAuthenticated) return;
+  mapOnlyLoad = false;
+  void media.loadAll().catch(() => undefined);
+});
+
+watch(() => auth.isAuthenticated, (authenticated) => {
+  if (!authenticated) mapState.clearSessionData();
+});
 
 onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
 
@@ -159,6 +182,10 @@ function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'for
 }
 
 function refreshCurrentView() {
+  if (route.name === 'map') {
+    window.dispatchEvent(new Event('geomidia:map-refresh'));
+    return;
+  }
   void media.loadAll();
   if (route.name === 'inventory') void media.refreshInventory();
 }

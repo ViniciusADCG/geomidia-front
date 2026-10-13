@@ -5,6 +5,10 @@ import type {
   ConflictAnalysis,
   ExpirationOverview,
   LoginResponse,
+  MapAssetPage,
+  MapClusterPage,
+  MapFilters,
+  MapViewport,
   LinkedApplicationFormResult,
   LinkedApplicationFormUpdate,
   MediaAsset,
@@ -145,6 +149,32 @@ export const api = {
       offset: params.offset,
     })}`);
   },
+  listMapAssets(viewport: MapViewport, filters: MapFilters = {}) {
+    return request<MapAssetPage>(`/media-assets/map${queryString({
+      north: viewport.north,
+      south: viewport.south,
+      east: viewport.east,
+      west: viewport.west,
+      media_type: filters.mediaType,
+      status: filters.status,
+      company: filters.company,
+    })}`);
+  },
+  listMapClusters(viewport: MapViewport, filters: MapFilters = {}) {
+    return request<MapClusterPage>(`/media-assets/map/clusters${queryString({
+      north: viewport.north,
+      south: viewport.south,
+      east: viewport.east,
+      west: viewport.west,
+      zoom: viewport.zoom,
+      media_type: filters.mediaType,
+      status: filters.status,
+      company: filters.company,
+    })}`);
+  },
+  listMapCompanyOptions() {
+    return request<string[]>('/media-assets/map/company-options');
+  },
   createMediaAsset(input: MediaAssetInput) {
     return request<MediaAsset>('/media-assets', { method: 'POST', body: JSON.stringify(input) });
   },
@@ -198,6 +228,9 @@ export const api = {
   },
   listApplicationForms(search = '') {
     return request<ApplicationForm[]>(`/application-forms${queryString({ search })}`);
+  },
+  getApplicationFormByAsset(assetId: string) {
+    return request<ApplicationForm>(`/application-forms/by-asset/${assetId}`);
   },
   updateApplicationForm(id: string, input: Partial<ApplicationFormInput>) {
     return request<ApplicationForm>(`/application-forms/${id}`, { method: 'PATCH', body: JSON.stringify(input) });

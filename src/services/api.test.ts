@@ -65,3 +65,32 @@ describe('listagem paginada de veículos', () => {
     });
   });
 });
+
+describe('API espacial do Mapa', () => {
+  it('envia bounds, zoom e filtros para endpoints espaciais sem limit global', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200, ok: true, json: async () => ({ items: [], clusters: [], total: 0, too_many: false, max_items: 1000 }),
+    }));
+    const viewport = { north: -20.45, south: -20.47, east: -54.60, west: -54.62, zoom: 12 };
+    const filters = { mediaType: 'outdoor' as const, status: 'aprovado' as const, company: 'Empresa Exemplo' };
+    await api.listMapAssets(viewport, filters);
+    await api.listMapClusters(viewport, filters);
+    const urls = vi.mocked(fetch).mock.calls.map((call) => new URL(call[0] as string));
+    expect(urls.map((url) => url.pathname)).toEqual(['/api/media-assets/map', '/api/media-assets/map/clusters']);
+    expect(Object.fromEntries(urls[0].searchParams)).toEqual({
+      north: '-20.45', south: '-20.47', east: '-54.6', west: '-54.62',
+      media_type: 'outdoor', status: 'aprovado', company: 'Empresa Exemplo',
+    });
+    expect(urls[1].searchParams.get('zoom')).toBe('12');
+    expect(urls[1].searchParams.has('limit')).toBe(false);
+  });
+
+  it('busca empresas e formulário somente pelos endpoints dedicados', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, ok: true, json: async () => [] }));
+    await api.listMapCompanyOptions();
+    await api.getApplicationFormByAsset('asset-1');
+    expect(vi.mocked(fetch).mock.calls.map((call) => new URL(call[0] as string).pathname)).toEqual([
+      '/api/media-assets/map/company-options', '/api/application-forms/by-asset/asset-1',
+    ]);
+  });
+});
