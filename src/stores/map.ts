@@ -24,6 +24,14 @@ interface MapState {
 const requestVersion = new WeakMap<object, number>();
 const selectionVersion = new WeakMap<object, number>();
 const optionsVersion = new WeakMap<object, number>();
+const currentQuery = new WeakMap<object, string>();
+const loadedQuery = new WeakMap<object, string>();
+const viewportInFlight = new WeakMap<object, { key: string; promise: Promise<void> }>();
+
+function queryKey(viewport: MapViewport, filters: MapFilters): string {
+  return JSON.stringify([viewport.north, viewport.south, viewport.east, viewport.west, viewport.zoom,
+    filters.mediaType ?? null, filters.status ?? null, filters.company ?? null]);
+}
 
 function nextVersion(versions: WeakMap<object, number>, store: object): number {
   const version = (versions.get(store) ?? 0) + 1;
@@ -57,6 +65,9 @@ export const useMapStore = defineStore('map', {
     invalidate() {
       nextVersion(requestVersion, this);
       nextVersion(selectionVersion, this);
+      currentQuery.delete(this);
+      loadedQuery.delete(this);
+      viewportInFlight.delete(this);
       this.loading = false;
       this.selectedLoading = false;
       this.formLoading = false;
@@ -76,57 +87,62 @@ export const useMapStore = defineStore('map', {
       }
     },
     stageViewport(viewport: MapViewport, filters: MapFilters) {
+      const key = queryKey(viewport, filters);
+      if (currentQuery.get(this) === key && (this.loading || loadedQuery.get(this) === key)) return false;
       nextVersion(requestVersion, this);
+      currentQuery.set(this, key);
+      viewportInFlight.delete(this);
       this.viewport = { ...viewport };
       this.filters = { ...filters };
-      this.items = [];
-      this.clusters = [];
-      this.total = 0;
-      this.tooMany = false;
       this.loading = true;
       this.error = null;
+      return true;
     },
-    async loadViewport(viewport: MapViewport, filters?: MapFilters) {
+    loadViewport(viewport: MapViewport, filters?: MapFilters, force = false): Promise<void> {
       const activeFilters = filters ?? this.filters;
+      const key = queryKey(viewport, activeFilters);
+      const inFlight = viewportInFlight.get(this);
+      if (!force && inFlight?.key === key && currentQuery.get(this) === key) return inFlight.promise;
+      if (!force && !this.loading && currentQuery.get(this) === key && loadedQuery.get(this) === key) {
+        return Promise.resolve();
+      }
       const version = nextVersion(requestVersion, this);
+      currentQuery.set(this, key);
       this.viewport = { ...viewport };
       this.filters = { ...activeFilters };
       this.loading = true;
       this.error = null;
-      this.items = [];
-      this.clusters = [];
-      this.total = 0;
-      this.tooMany = false;
-      try {
-        const page = await api.listMapAssets(viewport, activeFilters);
-        if (requestVersion.get(this) !== version) return;
-        if (page.too_many) {
-          const clustered = await api.listMapClusters(viewport, activeFilters);
+      const request = (async () => {
+        try {
+          const page = await api.listMapAssets(viewport, activeFilters);
           if (requestVersion.get(this) !== version) return;
-          if (clustered.clusters.reduce((sum, cluster) => sum + cluster.count, 0) !== clustered.total) {
-            throw new Error('A contagem dos agrupamentos não corresponde ao total da viewport.');
+          if (page.too_many) {
+            const clustered = await api.listMapClusters(viewport, activeFilters);
+            if (requestVersion.get(this) !== version) return;
+            if (clustered.clusters.reduce((sum, cluster) => sum + cluster.count, 0) !== clustered.total) {
+              throw new Error('A contagem dos agrupamentos não corresponde ao total da viewport.');
+            }
+            this.$patch({ items: [], clusters: clustered.clusters, total: clustered.total, tooMany: true });
+          } else {
+            this.$patch({ items: page.items, clusters: [], total: page.total, tooMany: false });
           }
-          this.clusters = clustered.clusters;
-          this.total = clustered.total;
-          this.tooMany = true;
-        } else {
-          this.items = page.items;
-          this.total = page.total;
+          loadedQuery.set(this, key);
+        } catch (error) {
+          if (requestVersion.get(this) === version) {
+            this.error = messageFrom(error, 'Falha ao carregar o mapa.');
+          }
+        } finally {
+          if (requestVersion.get(this) === version) {
+            this.loading = false;
+            viewportInFlight.delete(this);
+          }
         }
-      } catch (error) {
-        if (requestVersion.get(this) === version) {
-          this.error = messageFrom(error, 'Falha ao carregar o mapa.');
-          this.items = [];
-          this.clusters = [];
-          this.total = 0;
-          this.tooMany = false;
-        }
-      } finally {
-        if (requestVersion.get(this) === version) this.loading = false;
-      }
+      })();
+      viewportInFlight.set(this, { key, promise: request });
+      return request;
     },
     refreshViewport() {
-      if (this.viewport) return this.loadViewport(this.viewport, this.filters);
+      if (this.viewport) return this.loadViewport(this.viewport, this.filters, true);
       return Promise.resolve();
     },
     async selectAsset(id: string | null, loadForm: boolean) {

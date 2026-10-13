@@ -100,7 +100,6 @@ import { useDisplay } from 'vuetify';
 
 import AdminTopbar from './components/AdminTopbar.vue';
 import { exitVisualPreview, isVisualPreview } from './router';
-import { api } from './services/api';
 import { useAuthStore } from './stores/auth';
 import { useMapStore } from './stores/map';
 import { useMediaStore } from './stores/media';
@@ -113,7 +112,7 @@ const router = useRouter();
 const display = useDisplay();
 const drawer = ref(true);
 const confirmLogout = ref(false);
-let mapOnlyLoad = false;
+let sessionValidated = false;
 
 if (isVisualPreview()) {
   auth.role = 'admin';
@@ -150,29 +149,22 @@ watch(
   async (isPublic) => {
     if (isPublic || isVisualPreview() || !auth.isAuthenticated) return;
     if (await auth.validateSession()) {
-      if (route.name === 'map') {
-        mapOnlyLoad = true;
-        try {
-          media.rules = await api.listMediaRules();
-        } catch (error) {
-          media.error = error instanceof Error ? error.message : 'Falha ao carregar regras.';
-        }
-      } else {
-        await media.loadAll().catch(() => undefined);
-      }
+      sessionValidated = true;
+      loadRouteData(route.name);
     }
   },
   { immediate: true },
 );
 
 watch(() => route.name, (name) => {
-  if (name === 'map' || !mapOnlyLoad || !auth.isAuthenticated) return;
-  mapOnlyLoad = false;
-  void media.loadAll().catch(() => undefined);
+  if (sessionValidated && auth.isAuthenticated) loadRouteData(name);
 });
 
 watch(() => auth.isAuthenticated, (authenticated) => {
-  if (!authenticated) mapState.clearSessionData();
+  if (!authenticated) {
+    sessionValidated = false;
+    mapState.clearSessionData();
+  }
 });
 
 onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
@@ -186,8 +178,17 @@ function refreshCurrentView() {
     window.dispatchEvent(new Event('geomidia:map-refresh'));
     return;
   }
-  void media.loadAll();
-  if (route.name === 'inventory') void media.refreshInventory();
+  if (route.name === 'dashboard') void media.loadDashboard();
+  if (route.name === 'inventory') {
+    void media.refreshInventory();
+    void media.loadRules();
+  }
+  if (route.name === 'forms' || route.name === 'rules') void media.loadRules();
+}
+
+function loadRouteData(name: string | symbol | null | undefined) {
+  if (name === 'dashboard') void media.loadDashboard();
+  if (name === 'map' || name === 'inventory' || name === 'forms') void media.loadRules();
 }
 
 function handleViewOnMap(id: string) {
