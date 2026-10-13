@@ -130,6 +130,8 @@ export const api = {
     search?: string;
     mediaType?: MediaType;
     status?: MediaStatus;
+    district?: string;
+    company?: string;
     limit?: number;
     offset?: number;
   } = {}) {
@@ -137,6 +139,8 @@ export const api = {
       search: params.search,
       media_type: params.mediaType,
       status: params.status,
+      district: params.district,
+      company: params.company,
       limit: params.limit,
       offset: params.offset,
     })}`);

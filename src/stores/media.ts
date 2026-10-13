@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { api } from '../services/api';
-import type { ActivityLog, ApplicationForm, ConflictAnalysis, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaRule, MediaStats } from '../types';
+import type { ActivityLog, ApplicationForm, ConflictAnalysis, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaRule, MediaStats, MediaStatus, MediaType, Page } from '../types';
 
 const EMPTY_STATS: MediaStats = {
   total: 0,
@@ -17,6 +17,17 @@ const EMPTY_STATS: MediaStats = {
 interface MediaState {
   assets: MediaAsset[];
   assetTotal: number;
+  inventoryItems: MediaAsset[];
+  inventoryTotal: number;
+  inventoryPage: number;
+  inventoryPageSize: number;
+  inventorySearch: string;
+  inventorySearchDraft: string;
+  inventoryTypeFilter: MediaType | 'all';
+  inventoryStatusFilter: MediaStatus | 'all';
+  inventoryLoading: boolean;
+  inventoryLoaded: boolean;
+  inventoryError: string | null;
   activities: ActivityLog[];
   rules: MediaRule[];
   stats: MediaStats;
@@ -42,6 +53,8 @@ function failureMessage(label: string, result: PromiseSettledResult<unknown>): s
 
 const loadAllInFlight = new WeakMap<object, Promise<void>>();
 const sessionGeneration = new WeakMap<object, number>();
+const inventoryRequestVersion = new WeakMap<object, number>();
+const inventorySearchTimer = new WeakMap<object, ReturnType<typeof setTimeout>>();
 
 function generation(store: object): number {
   return sessionGeneration.get(store) ?? 0;
@@ -51,6 +64,17 @@ export const useMediaStore = defineStore('media', {
   state: (): MediaState => ({
     assets: [],
     assetTotal: 0,
+    inventoryItems: [],
+    inventoryTotal: 0,
+    inventoryPage: 1,
+    inventoryPageSize: 50,
+    inventorySearch: '',
+    inventorySearchDraft: '',
+    inventoryTypeFilter: 'all',
+    inventoryStatusFilter: 'all',
+    inventoryLoading: false,
+    inventoryLoaded: false,
+    inventoryError: null,
     activities: [],
     rules: [],
     stats: EMPTY_STATS,
@@ -68,12 +92,102 @@ export const useMediaStore = defineStore('media', {
   getters: {
     selectedAsset: (state) => state.assets.find((asset) => asset.id === state.selectedAssetId) ?? null,
     selectedApplicationForm: (state) => state.applicationForms.find((form) => form.asset_id === state.selectedAssetId) ?? null,
+    inventoryPageCount: (state) => Math.max(1, Math.ceil(state.inventoryTotal / state.inventoryPageSize)),
   },
   actions: {
     clearSessionData() {
       sessionGeneration.set(this, generation(this) + 1);
       loadAllInFlight.delete(this);
+      clearTimeout(inventorySearchTimer.get(this));
+      inventorySearchTimer.delete(this);
+      inventoryRequestVersion.delete(this);
       this.$reset();
+    },
+    async loadInventory(): Promise<Page<MediaAsset> | null> {
+      const session = generation(this);
+      const requestVersion = (inventoryRequestVersion.get(this) ?? 0) + 1;
+      inventoryRequestVersion.set(this, requestVersion);
+      const current = () => generation(this) === session && inventoryRequestVersion.get(this) === requestVersion;
+      this.inventoryLoading = true;
+      this.inventoryError = null;
+      this.inventoryItems = [];
+      this.inventoryTotal = 0;
+      try {
+        const page = await api.listMediaAssets({
+          search: this.inventorySearch || undefined,
+          mediaType: this.inventoryTypeFilter === 'all' ? undefined : this.inventoryTypeFilter,
+          status: this.inventoryStatusFilter === 'all' ? undefined : this.inventoryStatusFilter,
+          limit: this.inventoryPageSize,
+          offset: (this.inventoryPage - 1) * this.inventoryPageSize,
+        });
+        if (!current()) return null;
+        this.inventoryItems = page.items;
+        this.inventoryTotal = page.total;
+        this.inventoryLoaded = true;
+        return page;
+      } catch (error) {
+        if (current()) {
+          this.inventoryError = messageFrom(error, 'Falha ao carregar o inventário.');
+          this.inventoryLoaded = true;
+        }
+        return null;
+      } finally {
+        if (current()) this.inventoryLoading = false;
+      }
+    },
+    scheduleInventorySearch(value: string) {
+      this.inventorySearchDraft = value;
+      clearTimeout(inventorySearchTimer.get(this));
+      inventoryRequestVersion.set(this, (inventoryRequestVersion.get(this) ?? 0) + 1);
+      this.inventoryLoading = true;
+      const timer = setTimeout(() => {
+        inventorySearchTimer.delete(this);
+        this.inventorySearch = this.inventorySearchDraft.trim();
+        this.inventoryPage = 1;
+        void this.loadInventory();
+      }, 350);
+      inventorySearchTimer.set(this, timer);
+    },
+    refreshInventory() {
+      clearTimeout(inventorySearchTimer.get(this));
+      inventorySearchTimer.delete(this);
+      const search = this.inventorySearchDraft.trim();
+      if (search !== this.inventorySearch) {
+        this.inventorySearch = search;
+        this.inventoryPage = 1;
+      }
+      return this.loadInventory();
+    },
+    changeInventoryType(value: MediaType | 'all') {
+      this.inventoryTypeFilter = value;
+      this.inventoryPage = 1;
+      return this.refreshInventory();
+    },
+    changeInventoryStatus(value: MediaStatus | 'all') {
+      this.inventoryStatusFilter = value;
+      this.inventoryPage = 1;
+      return this.refreshInventory();
+    },
+    changeInventoryPageSize(value: number) {
+      this.inventoryPageSize = value;
+      this.inventoryPage = 1;
+      return this.refreshInventory();
+    },
+    changeInventoryPage(value: number) {
+      this.inventoryPage = value;
+      return this.refreshInventory();
+    },
+    async reloadInventoryAfterMutation() {
+      const page = await this.refreshInventory();
+      if (page && this.inventoryPage > 1 && this.inventoryPage > Math.max(1, Math.ceil(page.total / this.inventoryPageSize))) {
+        this.inventoryPage = Math.max(1, Math.ceil(page.total / this.inventoryPageSize));
+        await this.loadInventory();
+      }
+    },
+    async runInventoryMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      const result = await mutation();
+      await this.reloadInventoryAfterMutation();
+      return result;
     },
     async loadApplicationFormsForMap(force = false) {
       if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force && !this.applicationFormsError)) return;
@@ -107,7 +221,9 @@ export const useMediaStore = defineStore('media', {
         if (generation(this) !== session || loadAllInFlight.get(this) !== request) return;
 
         if (assetPage.status === 'fulfilled') {
+          const selected = this.assets.find((asset) => asset.id === this.selectedAssetId);
           this.assets = assetPage.value.items;
+          if (selected && !this.assets.some((asset) => asset.id === selected.id)) this.assets.push(selected);
           this.assetTotal = assetPage.value.total;
         }
         if (activityPage.status === 'fulfilled') this.activities = activityPage.value.items;
@@ -271,7 +387,11 @@ export const useMediaStore = defineStore('media', {
     selectAsset(id: string | null) {
       this.selectedAssetId = id;
       if (!id) return;
-      const asset = this.assets.find((item) => item.id === id);
+      let asset = this.assets.find((item) => item.id === id);
+      if (!asset) {
+        asset = this.inventoryItems.find((item) => item.id === id);
+        if (asset) this.assets.push(asset);
+      }
       if (asset?.status === 'novos processos') {
         delete this.analysisByAssetId[id];
         return;

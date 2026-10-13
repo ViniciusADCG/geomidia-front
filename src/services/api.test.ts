@@ -45,3 +45,23 @@ describe('respostas de autorização da API', () => {
     expect(window.dispatchEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('listagem paginada de veículos', () => {
+  it('envia paginação, busca e filtros com os nomes aceitos pelo backend', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200, ok: true,
+      json: async () => ({ items: [], total: 0, limit: 50, offset: 50 }),
+    }));
+
+    await api.listMediaAssets({
+      search: 'PROC 123', mediaType: 'outdoor', status: 'aprovado',
+      district: 'Centro', company: 'Empresa Exemplo', limit: 50, offset: 50,
+    });
+
+    const url = new URL(vi.mocked(fetch).mock.calls[0][0] as string);
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      search: 'PROC 123', media_type: 'outdoor', status: 'aprovado',
+      district: 'Centro', company: 'Empresa Exemplo', limit: '50', offset: '50',
+    });
+  });
+});
