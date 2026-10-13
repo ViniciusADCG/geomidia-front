@@ -71,6 +71,19 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+describe('permissões de interface', () => {
+  it('permite ações do inventário ao analista e as oculta do visualizador', () => {
+    const auth = useAuthStore();
+    auth.role = 'analyst';
+    expect(auth.canWrite).toBe(true);
+    expect(auth.canDelete).toBe(false);
+
+    auth.role = 'viewer';
+    expect(auth.canWrite).toBe(false);
+    expect(auth.canDelete).toBe(false);
+  });
+});
+
 describe('ciclo de sessão', () => {
   it('/auth/me 401 encerra a sessão e limpa credenciais e mídia', async () => {
     await login();
