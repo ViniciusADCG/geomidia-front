@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 
-import { api } from '../services/api';
+import { advanceSessionEpoch, api, ApiError } from '../services/api';
 import type { UserRole } from '../types';
+import { useMediaStore } from './media';
 
 interface AuthState {
   userId: string | null;
@@ -25,6 +26,12 @@ function clearSession() {
     });
 }
 
+const authGeneration = new WeakMap<object, number>();
+
+function generation(store: object): number {
+  return authGeneration.get(store) ?? 0;
+}
+
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     userId: stored('geomidia_user_id'),
@@ -44,10 +51,16 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async login(username: string, password: string, remember = false) {
+      const session = generation(this);
+      let completed = false;
       this.loading = true;
       this.error = null;
       try {
         const response = await api.login(username, password);
+        if (generation(this) !== session) throw new Error('Sessão alterada.');
+        authGeneration.set(this, generation(this) + 1);
+        advanceSessionEpoch();
+        useMediaStore().clearSessionData();
         clearSession();
         const storage = remember ? localStorage : sessionStorage;
         this.userId = response.user_id;
@@ -60,11 +73,12 @@ export const useAuthStore = defineStore('auth', {
         storage.setItem('geomidia_role', response.role);
         storage.setItem('geomidia_token', response.access_token);
         storage.setItem('geomidia_expires_at', response.expires_at);
+        completed = true;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Falha ao autenticar.';
+        if (generation(this) === session) this.error = error instanceof Error ? error.message : 'Falha ao autenticar.';
         throw error;
       } finally {
-        this.loading = false;
+        if (generation(this) === session || (completed && generation(this) === session + 1)) this.loading = false;
       }
     },
     async validateSession() {
@@ -72,23 +86,37 @@ export const useAuthStore = defineStore('auth', {
         this.logout();
         return false;
       }
+      const token = this.token;
+      const session = generation(this);
       try {
         const user = await api.me();
+        if (generation(this) !== session || this.token !== token) return false;
         this.userId = user.id;
         this.userName = user.full_name;
         this.role = user.role;
+        this.error = null;
         return true;
-      } catch {
-        this.logout();
-        return false;
+      } catch (error) {
+        if (generation(this) !== session || this.token !== token) return false;
+        if (error instanceof ApiError && error.status === 401) {
+          this.logout();
+          return false;
+        }
+        this.error = error instanceof Error ? error.message : 'Falha ao validar a sessão.';
+        return this.isAuthenticated;
       }
     },
     logout() {
+      authGeneration.set(this, generation(this) + 1);
+      advanceSessionEpoch();
+      useMediaStore().clearSessionData();
       this.userId = null;
       this.userName = null;
       this.role = null;
       this.token = null;
       this.expiresAt = null;
+      this.loading = false;
+      this.error = null;
       clearSession();
     },
   },
