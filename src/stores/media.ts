@@ -52,6 +52,8 @@ function failureMessage(label: string, result: PromiseSettledResult<unknown>): s
 }
 
 const loadAllInFlight = new WeakMap<object, Promise<void>>();
+const dashboardInFlight = new WeakMap<object, Promise<void>>();
+const rulesInFlight = new WeakMap<object, Promise<void>>();
 const sessionGeneration = new WeakMap<object, number>();
 const inventoryRequestVersion = new WeakMap<object, number>();
 const inventorySearchTimer = new WeakMap<object, ReturnType<typeof setTimeout>>();
@@ -98,6 +100,8 @@ export const useMediaStore = defineStore('media', {
     clearSessionData() {
       sessionGeneration.set(this, generation(this) + 1);
       loadAllInFlight.delete(this);
+      dashboardInFlight.delete(this);
+      rulesInFlight.delete(this);
       clearTimeout(inventorySearchTimer.get(this));
       inventorySearchTimer.delete(this);
       inventoryRequestVersion.delete(this);
@@ -205,6 +209,52 @@ export const useMediaStore = defineStore('media', {
       } finally {
         if (generation(this) === session) this.applicationFormsLoading = false;
       }
+    },
+    loadDashboard() {
+      const inFlight = dashboardInFlight.get(this);
+      if (inFlight) return inFlight;
+      const session = generation(this);
+      this.loading = true;
+      this.error = null;
+      const activities = api.listActivities().then((page) => {
+        if (generation(this) === session) this.activities = page.items;
+      });
+      const stats = api.getMediaStats().then((value) => {
+        if (generation(this) === session) {
+          this.stats = value;
+          this.assetTotal = value.total;
+        }
+      });
+      const request = Promise.allSettled([activities, stats]).then((results) => {
+        if (generation(this) !== session || dashboardInFlight.get(this) !== request) return;
+        const failures = [
+          failureMessage('atividades', results[0]),
+          failureMessage('estatísticas', results[1]),
+        ].filter((message): message is string => message !== null);
+        if (failures.length) this.error = `Falha ao carregar ${failures.join('; ')}.`;
+      }).finally(() => {
+        if (generation(this) !== session || dashboardInFlight.get(this) !== request) return;
+        dashboardInFlight.delete(this);
+        this.loading = false;
+      });
+      dashboardInFlight.set(this, request);
+      return request;
+    },
+    loadRules() {
+      const inFlight = rulesInFlight.get(this);
+      if (inFlight) return inFlight;
+      const session = generation(this);
+      const request = api.listMediaRules().then((rules) => {
+        if (generation(this) === session && rulesInFlight.get(this) === request) this.rules = rules;
+      }).catch((error: unknown) => {
+        if (generation(this) === session && rulesInFlight.get(this) === request) {
+          this.error = messageFrom(error, 'Falha ao carregar regras.');
+        }
+      }).finally(() => {
+        if (rulesInFlight.get(this) === request) rulesInFlight.delete(this);
+      });
+      rulesInFlight.set(this, request);
+      return request;
     },
     loadAll(force = false) {
       const session = generation(this);

@@ -69,6 +69,61 @@ describe('estado espacial do Mapa', () => {
     expect(store.tooMany).toBe(true);
   });
 
+  it('mantém os veículos anteriores até a nova viewport estar pronta e preserva-os em erro', async () => {
+    const store = useMapStore();
+    await store.loadViewport(viewport);
+    const pending = deferred<MapAssetPage>();
+    vi.mocked(api.listMapAssets).mockReturnValueOnce(pending.promise);
+    const next = { ...viewport, east: -54.59 };
+    expect(store.stageViewport(next, {})).toBe(true);
+    expect(store.items[0].id).toBe('one');
+    const request = store.loadViewport(next);
+    expect(store.items[0].id).toBe('one');
+    pending.resolve(individual('two'));
+    await request;
+    expect(store.items[0].id).toBe('two');
+
+    vi.mocked(api.listMapAssets).mockRejectedValueOnce(new Error('Falha'));
+    await store.loadViewport({ ...next, east: -54.58 });
+    expect(store.items[0].id).toBe('two');
+    expect(store.error).toBe('Falha');
+  });
+
+  it('mantém clusters durante a transição para nova viewport individual', async () => {
+    vi.mocked(api.listMapAssets).mockResolvedValueOnce(dense);
+    const store = useMapStore();
+    await store.loadViewport(viewport);
+    const pending = deferred<MapAssetPage>();
+    vi.mocked(api.listMapAssets).mockReturnValueOnce(pending.promise);
+    const next = { ...viewport, zoom: 16 };
+    store.stageViewport(next, {});
+    const request = store.loadViewport(next);
+    expect(store.clusters).toHaveLength(2);
+    expect(store.tooMany).toBe(true);
+    pending.resolve(individual('close'));
+    await request;
+    expect(store.clusters).toEqual([]);
+    expect(store.items[0].id).toBe('close');
+  });
+
+  it('deduplica eventos equivalentes e mantém refresh manual explícito', async () => {
+    const store = useMapStore();
+    expect(store.stageViewport(viewport, {})).toBe(true);
+    expect(store.stageViewport(viewport, {})).toBe(false);
+    const pending = deferred<MapAssetPage>();
+    vi.mocked(api.listMapAssets).mockReturnValueOnce(pending.promise);
+    const first = store.loadViewport(viewport);
+    const duplicate = store.loadViewport(viewport);
+    expect(api.listMapAssets).toHaveBeenCalledTimes(1);
+    pending.resolve(individual('one'));
+    await Promise.all([first, duplicate]);
+    expect(store.stageViewport(viewport, {})).toBe(false);
+    await store.loadViewport(viewport);
+    expect(api.listMapAssets).toHaveBeenCalledTimes(1);
+    await store.refreshViewport();
+    expect(api.listMapAssets).toHaveBeenCalledTimes(2);
+  });
+
   it('envia filtros, preserva viewport e filtros no refresh e troca clusters por indivíduos no zoom próximo', async () => {
     const store = useMapStore();
     const filters = { company: 'Empresa Exemplo', mediaType: 'outdoor' as const, status: 'aprovado' as const };
