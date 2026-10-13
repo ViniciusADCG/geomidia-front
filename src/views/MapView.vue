@@ -354,6 +354,7 @@ import { useAuthStore } from '../stores/auth';
 import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
+import { companyFilterOptions as getCompanyFilterOptions, companyKey } from '../utils/company-filter';
 import { formatDate, formatDateTime } from '../utils/format';
 
 const CAMPO_GRANDE_CENTER: [number, number] = [-20.464, -54.612];
@@ -384,26 +385,7 @@ let publicPropertiesLayer: L.GeoJSON | null = null;
 let publicPropertiesRenderer: L.Canvas | null = null;
 let publicPropertiesRequest: AbortController | null = null;
 
-const companyFilterOptions = computed(() => {
-  const companies = new Map<string, { title: string; value: string }>();
-
-  media.assets.forEach((asset) => {
-    const name = asset.company_responsible?.trim();
-    if (!name) return;
-
-    const key = companyKey(name, asset.company_cnpj);
-    const cnpjLabel = formatCompanyCnpj(asset.company_cnpj);
-    companies.set(key, {
-      title: `${name} - CNPJ ${cnpjLabel}`,
-      value: key,
-    });
-  });
-
-  return [
-    { title: 'Todas as empresas', value: 'all' },
-    ...Array.from(companies.values()).sort((first, second) => first.title.localeCompare(second.title, 'pt-BR')),
-  ];
-});
+const companyFilterOptions = computed(() => getCompanyFilterOptions(media.assets));
 
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
@@ -422,7 +404,7 @@ const statusFilterOptions = computed(() => [
 ]);
 
 const filteredAssets = computed(() => media.assets.filter((asset) => (
-  (companyFilter.value === 'all' || companyKey(asset.company_responsible, asset.company_cnpj) === companyFilter.value)
+  (companyFilter.value === 'all' || companyKey(asset) === companyFilter.value)
   && (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
   && (statusFilter.value === 'all' || asset.status === statusFilter.value)
 )));
@@ -574,14 +556,6 @@ function blankDraft(): MediaAssetInput {
     contact_name: '',
     contact_email: '',
   };
-}
-
-function companyKey(name: string | null | undefined, cnpj: string | null | undefined): string {
-  return `${normalizeCompanyValue(name)}::${normalizeCompanyValue(cnpj)}`;
-}
-
-function normalizeCompanyValue(value: string | null | undefined): string {
-  return String(value ?? '').trim().toLocaleLowerCase('pt-BR');
 }
 
 function formatCompanyCnpj(value: string | null | undefined): string {
