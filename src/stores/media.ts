@@ -41,6 +41,11 @@ function failureMessage(label: string, result: PromiseSettledResult<unknown>): s
 }
 
 const loadAllInFlight = new WeakMap<object, Promise<void>>();
+const sessionGeneration = new WeakMap<object, number>();
+
+function generation(store: object): number {
+  return sessionGeneration.get(store) ?? 0;
+}
 
 export const useMediaStore = defineStore('media', {
   state: (): MediaState => ({
@@ -65,20 +70,30 @@ export const useMediaStore = defineStore('media', {
     selectedApplicationForm: (state) => state.applicationForms.find((form) => form.asset_id === state.selectedAssetId) ?? null,
   },
   actions: {
+    clearSessionData() {
+      sessionGeneration.set(this, generation(this) + 1);
+      loadAllInFlight.delete(this);
+      this.$reset();
+    },
     async loadApplicationFormsForMap(force = false) {
       if (this.applicationFormsLoading || (this.applicationFormsLoaded && !force && !this.applicationFormsError)) return;
+      const session = generation(this);
       this.applicationFormsLoading = true;
       this.applicationFormsError = null;
       try {
-        this.applicationForms = await api.listApplicationForms();
+        const forms = await api.listApplicationForms();
+        if (generation(this) !== session) return;
+        this.applicationForms = forms;
         this.applicationFormsLoaded = true;
       } catch (error) {
+        if (generation(this) !== session) return;
         this.applicationFormsError = messageFrom(error, 'Falha ao carregar os dados da solicitação.');
       } finally {
-        this.applicationFormsLoading = false;
+        if (generation(this) === session) this.applicationFormsLoading = false;
       }
     },
     loadAll(force = false) {
+      const session = generation(this);
       const inFlight = loadAllInFlight.get(this);
       if (inFlight && !force) return inFlight;
       this.loading = true;
@@ -89,7 +104,7 @@ export const useMediaStore = defineStore('media', {
         api.getMediaStats(),
         api.listMediaRules(),
       ]).then(([assetPage, activityPage, stats, rules]) => {
-        if (loadAllInFlight.get(this) !== request) return;
+        if (generation(this) !== session || loadAllInFlight.get(this) !== request) return;
 
         if (assetPage.status === 'fulfilled') {
           this.assets = assetPage.value.items;
@@ -110,12 +125,12 @@ export const useMediaStore = defineStore('media', {
           throw new Error(this.error);
         }
       }).catch((error: unknown) => {
-        if (loadAllInFlight.get(this) === request) {
+        if (generation(this) === session && loadAllInFlight.get(this) === request) {
           this.error = messageFrom(error, 'Falha ao carregar dados.');
         }
         throw error;
       }).finally(() => {
-        if (loadAllInFlight.get(this) !== request) return;
+        if (generation(this) !== session || loadAllInFlight.get(this) !== request) return;
         loadAllInFlight.delete(this);
         this.loading = false;
       });
@@ -123,62 +138,76 @@ export const useMediaStore = defineStore('media', {
       return request;
     },
     async refreshMeta() {
+      const session = generation(this);
       const [activityPage, stats] = await Promise.all([api.listActivities(), api.getMediaStats()]);
+      if (generation(this) !== session) return;
       this.activities = activityPage.items;
       this.stats = stats;
       this.assetTotal = stats.total;
     },
     async createAsset(input: MediaAssetInput) {
+      const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
         const created = await api.createMediaAsset(input);
+        if (generation(this) !== session) return created;
         this.assets.unshift(created);
         await this.refreshMeta();
         return created;
       } catch (error) {
+        if (generation(this) !== session) throw error;
         this.error = messageFrom(error, 'Falha ao cadastrar o ativo.');
         throw error;
       } finally {
-        this.saving = false;
+        if (generation(this) === session) this.saving = false;
       }
     },
     async updateAsset(id: string, input: Partial<MediaAssetInput>) {
+      const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
         const updated = await api.updateMediaAsset(id, input);
+        if (generation(this) !== session) return updated;
         const index = this.assets.findIndex((asset) => asset.id === id);
         if (index >= 0) this.assets[index] = updated;
         await this.refreshMeta();
-        if (this.selectedAssetId === id && updated.status !== 'novos processos') await this.analyzeAsset(id);
+        if (generation(this) === session && this.selectedAssetId === id && updated.status !== 'novos processos') await this.analyzeAsset(id);
         return updated;
       } catch (error) {
+        if (generation(this) !== session) throw error;
         this.error = messageFrom(error, 'Falha ao atualizar o ativo.');
         throw error;
       } finally {
-        this.saving = false;
+        if (generation(this) === session) this.saving = false;
       }
     },
     async updateLinkedAsset(id: string, formId: string, formInput: Partial<ApplicationFormInput>, assetInput: Partial<MediaAssetInput>) {
+      const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
         if (Object.keys(formInput).length) {
           const form = await api.updateApplicationForm(formId, formInput);
+          if (generation(this) !== session) throw new Error('Sessão alterada.');
           const formIndex = this.applicationForms.findIndex((item) => item.id === formId);
           if (formIndex >= 0) this.applicationForms[formIndex] = form;
         }
         if (Object.keys(assetInput).length) await api.updateMediaAsset(id, assetInput);
+        if (generation(this) !== session) throw new Error('Sessão alterada.');
         const asset = await api.getMediaAsset(id);
+        if (generation(this) !== session) return asset;
         const assetIndex = this.assets.findIndex((item) => item.id === id);
         if (assetIndex >= 0) this.assets[assetIndex] = asset;
         await this.refreshMeta();
-        if (this.selectedAssetId === id && asset.status !== 'novos processos') await this.analyzeAsset(id);
+        if (generation(this) === session && this.selectedAssetId === id && asset.status !== 'novos processos') await this.analyzeAsset(id);
         return asset;
       } catch (error) {
+        if (generation(this) !== session) throw error;
         // The form and asset endpoints commit separately; reload both after a partial save.
         const [asset, form] = await Promise.allSettled([api.getMediaAsset(id), api.listApplicationForms()]);
+        if (generation(this) !== session) throw error;
         if (asset.status === 'fulfilled') {
           const index = this.assets.findIndex((item) => item.id === id);
           if (index >= 0) this.assets[index] = asset.value;
@@ -187,51 +216,61 @@ export const useMediaStore = defineStore('media', {
         this.error = messageFrom(error, 'Falha ao atualizar o cadastro.');
         throw error;
       } finally {
-        this.saving = false;
+        if (generation(this) === session) this.saving = false;
       }
     },
     async startAnalysis(id: string) {
+      const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
         const updated = await api.startMediaAssetAnalysis(id);
+        if (generation(this) !== session) return updated;
         const index = this.assets.findIndex((asset) => asset.id === id);
         if (index >= 0) this.assets[index] = updated;
         await this.refreshMeta();
-        if (this.selectedAssetId === id) await this.analyzeAsset(id);
+        if (generation(this) === session && this.selectedAssetId === id) await this.analyzeAsset(id);
         return updated;
       } catch (error) {
+        if (generation(this) !== session) throw error;
         this.error = messageFrom(error, 'Falha ao iniciar a análise do processo.');
         throw error;
       } finally {
-        this.saving = false;
+        if (generation(this) === session) this.saving = false;
       }
     },
     async deleteAsset(id: string) {
+      const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
         await api.deleteMediaAsset(id);
+        if (generation(this) !== session) return;
         this.assets = this.assets.filter((asset) => asset.id !== id);
         if (this.selectedAssetId === id) this.selectedAssetId = null;
         delete this.analysisByAssetId[id];
         await this.refreshMeta();
       } catch (error) {
+        if (generation(this) !== session) throw error;
         this.error = messageFrom(error, 'Falha ao excluir o ativo.');
         throw error;
       } finally {
-        this.saving = false;
+        if (generation(this) === session) this.saving = false;
       }
     },
     async analyzeAsset(id: string) {
+      const session = generation(this);
       this.analyzing = true;
       try {
-        this.analysisByAssetId[id] = await api.analyzeMediaAsset(id);
+        const analysis = await api.analyzeMediaAsset(id);
+        if (generation(this) !== session) return;
+        this.analysisByAssetId[id] = analysis;
       } catch (error) {
+        if (generation(this) !== session) throw error;
         this.error = messageFrom(error, 'Falha ao analisar conflitos.');
         throw error;
       } finally {
-        this.analyzing = false;
+        if (generation(this) === session) this.analyzing = false;
       }
     },
     selectAsset(id: string | null) {

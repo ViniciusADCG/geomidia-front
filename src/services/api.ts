@@ -19,6 +19,11 @@ import type {
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
+let sessionEpoch = 0;
+
+export function advanceSessionEpoch(): void {
+  sessionEpoch += 1;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -48,6 +53,7 @@ function errorMessage(payload: unknown): string {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = accessToken();
+  const requestEpoch = sessionEpoch;
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -70,8 +76,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401 && path !== '/auth/login') {
-      window.dispatchEvent(new CustomEvent('geomidia:unauthorized'));
+    if (response.status === 401 && path !== '/auth/login' && requestEpoch === sessionEpoch) {
+      window.dispatchEvent(new CustomEvent('geomidia:unauthorized', { detail: { token } }));
     }
     throw new ApiError(errorMessage(payload), response.status, payload);
   }
@@ -80,6 +86,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 async function requestPdf(path: string): Promise<Blob> {
   const token = accessToken();
+  const requestEpoch = sessionEpoch;
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -89,7 +96,9 @@ async function requestPdf(path: string): Promise<Blob> {
     throw new ApiError('Não foi possível conectar à API para baixar o comprovante.', 0);
   }
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new CustomEvent('geomidia:unauthorized'));
+    if (response.status === 401 && requestEpoch === sessionEpoch) {
+      window.dispatchEvent(new CustomEvent('geomidia:unauthorized', { detail: { token } }));
+    }
     const payload = await response.json().catch(() => null);
     throw new ApiError(errorMessage(payload), response.status, payload);
   }
