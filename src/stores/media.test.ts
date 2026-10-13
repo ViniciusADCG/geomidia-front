@@ -116,6 +116,18 @@ beforeEach(() => {
 });
 
 describe('carregamento global de mídia', () => {
+  it('preserva no Mapa o item selecionado pelo Inventário fora da página global', async () => {
+    const store = useMediaStore();
+    store.inventoryItems = [asset('fora-da-pagina')];
+    store.selectAsset('fora-da-pagina');
+    mockLoadAllSuccess();
+
+    await store.loadAll();
+
+    expect(store.selectedAsset?.id).toBe('fora-da-pagina');
+    expect(store.assets.map((item) => item.id)).toEqual(['novo', 'fora-da-pagina']);
+  });
+
   it('reutiliza a carga em andamento para chamadas simultâneas equivalentes', async () => {
     const store = useMediaStore();
     const pending = deferred<Page<MediaAsset>>();

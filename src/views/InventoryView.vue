@@ -14,26 +14,29 @@
       <v-row dense>
         <v-col cols="12" md="6">
           <v-text-field
-            v-model="search"
-            label="Buscar endereço, bairro ou processo"
+            :model-value="media.inventorySearchDraft"
+            label="Buscar endereço, bairro, processo ou empresa"
             prepend-inner-icon="mdi-magnify"
             hide-details
+            @update:model-value="media.scheduleInventorySearch($event)"
           />
         </v-col>
         <v-col cols="12" md="3">
           <v-select
-            v-model="typeFilter"
+            :model-value="media.inventoryTypeFilter"
             :items="typeFilterOptions"
             label="Tipo"
             hide-details
+            @update:model-value="media.changeInventoryType($event)"
           />
         </v-col>
         <v-col cols="12" md="3">
           <v-select
-            v-model="statusFilter"
+            :model-value="media.inventoryStatusFilter"
             :items="statusFilterOptions"
             label="Status"
             hide-details
+            @update:model-value="media.changeInventoryStatus($event)"
           />
         </v-col>
       </v-row>
@@ -56,15 +59,25 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="filteredAssets.length === 0">
+            <tr v-if="media.inventoryLoading || media.inventoryError || media.inventoryItems.length === 0">
               <td colspan="9">
                 <div class="empty-table">
-                  <v-icon icon="mdi-database-search-outline" size="42" />
-                  <span>Nenhum ativo encontrado.</span>
+                  <v-progress-circular v-if="media.inventoryLoading" indeterminate color="primary" />
+                  <template v-else-if="media.inventoryError">
+                    <span>Erro ao carregar o inventário: {{ media.inventoryError }}</span>
+                    <v-btn variant="text" @click="media.refreshInventory()">Tentar novamente</v-btn>
+                  </template>
+                  <template v-else>
+                    <v-icon icon="mdi-database-search-outline" size="42" />
+                    <span v-if="!media.inventoryLoaded">Carregando inventário...</span>
+                    <span v-else-if="media.inventoryTotal === 0 && !hasInventoryFilters">Nenhum veículo cadastrado.</span>
+                    <span v-else-if="media.inventoryTotal === 0">Nenhum resultado para a busca e os filtros atuais.</span>
+                    <span v-else>Esta página está vazia. Atualize o inventário.</span>
+                  </template>
                 </div>
               </td>
             </tr>
-            <tr v-for="asset in filteredAssets" :key="asset.id">
+            <tr v-for="asset in visibleInventoryItems" :key="asset.id">
               <td class="process-code">{{ asset.official_process_code || asset.process_code }}<small v-if="asset.official_process_code" class="origin-code">Origem: {{ asset.process_code }}</small></td>
               <td class="address-cell">{{ asset.address }}</td>
               <td>{{ asset.district }}</td>
@@ -123,9 +136,28 @@
         </v-table>
       </div>
       <div class="table-footer">
-        <span>Total cadastrado: {{ media.assetTotal }}</span>
-        <span>Exibindo {{ filteredAssets.length }} de {{ media.assetTotal }}</span>
+        <span v-if="media.inventoryLoading">Carregando inventário...</span>
+        <span v-else-if="media.inventoryError">Falha ao carregar resultados</span>
+        <span v-else-if="media.inventoryTotal">Exibindo {{ inventoryStart }}–{{ inventoryEnd }} de {{ media.inventoryTotal }}</span>
+        <span v-else>0 resultados</span>
+        <v-select
+          :model-value="media.inventoryPageSize"
+          :items="[25, 50, 100]"
+          label="Por página"
+          density="compact"
+          hide-details
+          style="max-width: 135px"
+          @update:model-value="media.changeInventoryPageSize($event)"
+        />
       </div>
+      <v-pagination
+        v-if="!media.inventoryLoading && !media.inventoryError && media.inventoryPageCount > 1"
+        :model-value="media.inventoryPage"
+        :length="media.inventoryPageCount"
+        :total-visible="5"
+        aria-label="Páginas do inventário"
+        @update:model-value="media.changeInventoryPage($event)"
+      />
     </v-card>
 
     <v-dialog v-model="dialog" max-width="860" scrollable>
@@ -330,7 +362,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import {
   DECISION_STATUS_OPTIONS,
@@ -345,7 +377,7 @@ import {
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
-import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput } from '../types';
 import { formatCoordinate, formatDate, formatDateTime } from '../utils/format';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
@@ -354,15 +386,19 @@ defineEmits<{ 'view-map': [id: string] }>();
 
 const media = useMediaStore();
 const auth = useAuthStore();
-const search = ref('');
-const typeFilter = ref<MediaType | 'all'>('all');
-const statusFilter = ref<MediaStatus | 'all'>('all');
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
+const editingAsset = ref<MediaAsset | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
 const formValid = ref(false);
 const attachmentLinkDraft = ref('');
 const attachmentLinks = ref<string[]>([]);
+const visibleInventoryItems = computed(() => media.inventoryLoading || media.inventoryError ? [] : media.inventoryItems);
+const hasInventoryFilters = computed(() => Boolean(media.inventorySearch || media.inventorySearchDraft.trim()
+  || media.inventoryTypeFilter !== 'all' || media.inventoryStatusFilter !== 'all'));
+const inventoryStart = computed(() => (media.inventoryPage - 1) * media.inventoryPageSize + 1);
+const inventoryEnd = computed(() => (media.inventoryPage - 1) * media.inventoryPageSize + media.inventoryItems.length);
+onMounted(() => { void media.refreshInventory(); });
 const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
 const minLength = (length: number) => (value: string) => value.trim().length >= length || `Mínimo de ${length} caracteres.`;
 const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
@@ -390,7 +426,6 @@ watch(() => form.media_type, () => {
   if (!editingId.value) form.area_rule_classification = null;
 });
 const formDetails = reactive<ApplicationFormInput>(blankFormDetails());
-const editingAsset = computed(() => media.assets.find((asset) => asset.id === editingId.value) ?? null);
 const selectedForm = computed(() => media.applicationForms.find((item) => item.asset_id === editingId.value) ?? null);
 const editable = computed(() => selectedForm.value ? formDetails : form);
 const formManualLinks = computed(() => parseAttachmentLinks(selectedForm.value?.attachment_links).filter((link) => /^https?:\/\//i.test(link)));
@@ -409,23 +444,6 @@ const deleteDialog = computed({
 const calculatedRadius = computed(() => getRequiredRadius(
   editable.value.media_type, editable.value.area_m2, media.rules, editable.value.area_rule_classification,
 ));
-
-const filteredAssets = computed(() => {
-  const term = search.value.trim().toLowerCase();
-  return media.assets.filter((asset) => {
-    const matchesSearch =
-      !term ||
-      asset.address.toLowerCase().includes(term) ||
-      asset.district.toLowerCase().includes(term) ||
-      asset.process_code.toLowerCase().includes(term) ||
-      (asset.official_process_code ?? '').toLowerCase().includes(term);
-
-    const matchesType = typeFilter.value === 'all' || asset.media_type === typeFilter.value;
-    const matchesStatus = statusFilter.value === 'all' || asset.status === statusFilter.value;
-
-    return matchesSearch && matchesType && matchesStatus;
-  });
-});
 
 function blankForm(): MediaAssetInput {
   return {
@@ -514,6 +532,7 @@ function sanitizeForm(): MediaAssetInput {
 
 function openCreateDialog() {
   editingId.value = null;
+  editingAsset.value = null;
   Object.assign(form, blankForm());
   resetAttachmentLinks('');
   dialog.value = true;
@@ -521,6 +540,7 @@ function openCreateDialog() {
 
 function openEditDialog(asset: MediaAsset) {
   editingId.value = asset.id;
+  editingAsset.value = asset;
   Object.assign(form, {
     official_process_code: asset.official_process_code ?? null,
     media_type: asset.media_type,
@@ -559,55 +579,59 @@ async function save() {
   if (editingId.value && !media.applicationFormsLoaded) return;
 
   try {
-    if (editingId.value) {
-      if (selectedForm.value) {
-        const formPayload = {
-          ...formDetailsFrom(selectedForm.value),
-          ...formDetails,
-          company_cnpj: formDetails.company_cnpj || null,
-          number_of_faces: formDetails.number_of_faces || null,
-          expiration_date: formDetails.expiration_date || null,
-        };
-        const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
-          ([key, value]) => [
-            'company_responsible', 'company_cnpj', 'municipal_registration', 'property_registration',
-            'street', 'number', 'district', 'postal_code', 'latitude', 'longitude', 'media_type',
-            'number_of_faces', 'expiration_date', 'requester_email',
-          ].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
-        )) as LinkedApplicationFormUpdate['form'];
-        const assetPayload = {
-          official_process_code: form.official_process_code?.trim() || null,
-          width_m: form.width_m || null,
-          top_height_m: form.top_height_m || null,
-          status: form.status,
-          justification: form.justification || null,
-          contact_name: form.contact_name || null,
-          attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
-        };
-        const assetChanges = Object.fromEntries(Object.entries(assetPayload).filter(
-          ([key, value]) => value !== editingAsset.value?.[key as keyof MediaAsset],
-        )) as LinkedApplicationFormUpdate['asset'];
-        if (Object.keys(formChanges).length || Object.keys(assetChanges).length) {
-          await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
-        }
-      } else {
-        const changes = Object.fromEntries(Object.entries(sanitizeForm()).filter(
-          ([key]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key),
-        )) as Partial<MediaAssetInput>;
-        await media.updateAsset(editingId.value, changes);
-      }
-    } else {
-      await media.createAsset(sanitizeForm());
-    }
+    await media.runInventoryMutation(saveChanges);
     dialog.value = false;
   } catch {
     // O store publica o erro no alerta global.
   }
 }
 
+async function saveChanges() {
+  if (editingId.value) {
+    if (selectedForm.value) {
+      const formPayload = {
+        ...formDetailsFrom(selectedForm.value),
+        ...formDetails,
+        company_cnpj: formDetails.company_cnpj || null,
+        number_of_faces: formDetails.number_of_faces || null,
+        expiration_date: formDetails.expiration_date || null,
+      };
+      const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
+        ([key, value]) => [
+          'company_responsible', 'company_cnpj', 'municipal_registration', 'property_registration',
+          'street', 'number', 'district', 'postal_code', 'latitude', 'longitude', 'media_type',
+          'number_of_faces', 'expiration_date', 'requester_email',
+        ].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
+      )) as LinkedApplicationFormUpdate['form'];
+      const assetPayload = {
+        official_process_code: form.official_process_code?.trim() || null,
+        width_m: form.width_m || null,
+        top_height_m: form.top_height_m || null,
+        status: form.status,
+        justification: form.justification || null,
+        contact_name: form.contact_name || null,
+        attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
+      };
+      const assetChanges = Object.fromEntries(Object.entries(assetPayload).filter(
+        ([key, value]) => value !== editingAsset.value?.[key as keyof MediaAsset],
+      )) as LinkedApplicationFormUpdate['asset'];
+      if (Object.keys(formChanges).length || Object.keys(assetChanges).length) {
+        await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
+      }
+    } else {
+      const changes = Object.fromEntries(Object.entries(sanitizeForm()).filter(
+        ([key]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key),
+      )) as Partial<MediaAssetInput>;
+      await media.updateAsset(editingId.value, changes);
+    }
+  } else {
+    await media.createAsset(sanitizeForm());
+  }
+}
+
 async function startAnalysis(asset: MediaAsset) {
   try {
-    await media.startAnalysis(asset.id);
+    await media.runInventoryMutation(() => media.startAnalysis(asset.id));
   } catch {
     // O store publica o erro no alerta global.
   }
@@ -616,7 +640,8 @@ async function startAnalysis(asset: MediaAsset) {
 async function confirmDelete() {
   if (!auth.canWrite || !deleteTarget.value) return;
   try {
-    await media.deleteAsset(deleteTarget.value.id);
+    const assetId = deleteTarget.value.id;
+    await media.runInventoryMutation(() => media.deleteAsset(assetId));
     deleteTarget.value = null;
   } catch {
     // O store publica o erro no alerta global.
