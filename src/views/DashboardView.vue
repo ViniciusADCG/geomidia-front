@@ -6,7 +6,7 @@
         <p>Visão geral do inventário municipal de mídia exterior.</p>
       </div>
       <div class="header-actions">
-        <v-btn v-if="auth.canWrite" variant="outlined" prepend-icon="mdi-download" @click="exportJson">Exportar</v-btn>
+        <v-btn v-if="auth.canWrite" variant="outlined" prepend-icon="mdi-download" :loading="exportLoading" @click="exportJson">Exportar</v-btn>
         <v-btn v-if="auth.canWrite" color="primary" prepend-icon="mdi-plus" @click="$emit('navigate', 'inventory')">Novo Cadastro</v-btn>
       </div>
     </div>
@@ -42,7 +42,7 @@
             </v-btn>
           </div>
 
-          <div v-if="media.assets.length === 0" class="empty-state">
+          <div v-if="media.stats.total === 0" class="empty-state">
             <v-icon icon="mdi-folder-open-outline" size="42" />
             <span>Nenhum ativo cadastrado.</span>
           </div>
@@ -90,9 +90,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { MEDIA_TYPE_OPTIONS, mediaTypeColor, mediaTypeLabel } from '../domain/rules';
+import { api } from '../services/api';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
 import type { ActivityType } from '../types';
@@ -102,6 +103,7 @@ defineEmits<{ navigate: ['dashboard' | 'map' | 'inventory' | 'expirations'] }>()
 
 const media = useMediaStore();
 const auth = useAuthStore();
+const exportLoading = ref(false);
 
 const kpis = computed(() => [
   {
@@ -181,14 +183,31 @@ function activityColor(type: ActivityType) {
   return 'warning';
 }
 
-function exportJson() {
-  const data = JSON.stringify(media.assets, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const href = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = href;
-  link.download = 'inventario-geomidia.json';
-  link.click();
-  URL.revokeObjectURL(href);
+async function exportJson() {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    const items = [];
+    let offset = 0;
+    let total = 0;
+    do {
+      const page = await api.listMediaAssets({ limit: 500, offset });
+      items.push(...page.items);
+      total = page.total;
+      offset += page.items.length;
+      if (page.items.length === 0) break;
+    } while (offset < total);
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = 'inventario-geomidia.json';
+    link.click();
+    URL.revokeObjectURL(href);
+  } catch (error) {
+    media.error = error instanceof Error ? error.message : 'Falha ao exportar o inventário.';
+  } finally {
+    exportLoading.value = false;
+  }
 }
 </script>

@@ -115,6 +115,40 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+describe('dados necessários ao Dashboard', () => {
+  it('carrega estatísticas sem listar 500 veículos e publica antes das atividades', async () => {
+    const store = useMediaStore();
+    const pending = deferred<Page<ActivityLog>>();
+    vi.mocked(api.listActivities).mockReturnValue(pending.promise);
+    vi.mocked(api.getMediaStats).mockResolvedValue(stats(2438));
+    const loading = store.loadDashboard();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.stats.total).toBe(2438);
+    expect(store.loading).toBe(true);
+    expect(api.listMediaAssets).not.toHaveBeenCalled();
+    expect(api.listMediaRules).not.toHaveBeenCalled();
+    pending.resolve({ items: [activity('recente')], total: 1, limit: 30, offset: 0 });
+    await loading;
+    expect(store.activities[0].id).toBe('recente');
+    expect(store.loading).toBe(false);
+  });
+
+  it('preserva estatísticas se atividades falham e carrega regras só quando solicitadas', async () => {
+    const store = useMediaStore();
+    vi.mocked(api.listActivities).mockRejectedValue(new Error('sem atividades'));
+    vi.mocked(api.getMediaStats).mockResolvedValue(stats(10));
+    vi.mocked(api.listMediaRules).mockResolvedValue([rule('mapa')]);
+    await store.loadDashboard();
+    expect(store.stats.total).toBe(10);
+    expect(store.error).toContain('atividades');
+    expect(api.listMediaRules).not.toHaveBeenCalled();
+    await store.loadRules();
+    expect(store.rules[0].id).toBe('mapa');
+    expect(api.listMediaAssets).not.toHaveBeenCalled();
+  });
+});
+
 describe('carregamento global de mídia', () => {
   it('preserva no Mapa o item selecionado pelo Inventário fora da página global', async () => {
     const store = useMediaStore();

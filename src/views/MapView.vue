@@ -583,12 +583,13 @@ function currentFilters() {
 function scheduleViewportLoad() {
   const viewport = currentViewport();
   if (!viewport) return;
-  mapState.stageViewport(viewport, currentFilters());
-  viewportScheduler.schedule();
+  if (mapState.stageViewport(viewport, currentFilters())) viewportScheduler.schedule();
 }
 
 function refreshMap() {
-  viewportScheduler.flush();
+  viewportScheduler.cancel();
+  const viewport = currentViewport();
+  if (viewport) void mapState.loadViewport(viewport, currentFilters(), true);
 }
 
 function blankDraft(): MediaAssetInput {
