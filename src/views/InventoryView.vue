@@ -108,6 +108,7 @@
                     @click="openEditDialog(asset)"
                   />
                   <v-btn
+                    v-if="auth.canWrite"
                     icon="mdi-trash-can-outline"
                     size="small"
                     color="error"
@@ -312,7 +313,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="deleteDialog" max-width="440">
+    <v-dialog v-if="auth.canWrite" v-model="deleteDialog" max-width="440">
       <v-card title="Confirmar exclusão">
         <v-card-text>
           Remover permanentemente o processo
@@ -613,7 +614,7 @@ async function startAnalysis(asset: MediaAsset) {
 }
 
 async function confirmDelete() {
-  if (!deleteTarget.value) return;
+  if (!auth.canWrite || !deleteTarget.value) return;
   try {
     await media.deleteAsset(deleteTarget.value.id);
     deleteTarget.value = null;
