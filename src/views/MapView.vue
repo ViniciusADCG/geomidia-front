@@ -11,7 +11,9 @@
       <div class="map-topbar">
         <div>
           <strong>Mapa GIS · Campo Grande, MS</strong>
-          <span>{{ filteredAssets.length }} ativo(s) exibido(s)</span>
+          <span v-if="mapState.loading">Atualizando mapa...</span>
+          <span v-else-if="mapState.error">Não foi possível carregar o mapa</span>
+          <span v-else>{{ mapState.total }} ativo(s) na área visível{{ mapState.tooMany ? ' · agrupados' : '' }}</span>
         </div>
         <div class="map-filters">
           <v-select
@@ -38,6 +40,10 @@
         </div>
       </div>
       <div ref="mapElement" class="leaflet-map" />
+      <v-alert v-if="mapState.error" type="error" variant="tonal" density="compact" class="ma-2">
+        {{ mapState.error }}
+        <v-btn variant="text" size="small" @click="refreshMap">Tentar novamente</v-btn>
+      </v-alert>
     </v-card>
 
     <aside ref="sideStack" class="side-stack">
@@ -93,7 +99,7 @@
               <v-chip :color="statusColor(selectedAsset.status)" variant="tonal" class="status-chip">
                 {{ statusLabel(selectedAsset.status) }}
               </v-chip>
-              <v-btn icon="mdi-close" size="small" variant="text" title="Fechar detalhes" aria-label="Fechar detalhes" @click="media.selectAsset(null)" />
+              <v-btn icon="mdi-close" size="small" variant="text" title="Fechar detalhes" aria-label="Fechar detalhes" @click="mapState.selectAsset(null, auth.canWrite)" />
             </div>
           </div>
 
@@ -137,12 +143,12 @@
             />
           </v-list>
 
-          <v-alert v-if="media.applicationFormsLoading && auth.canWrite" type="info" variant="tonal" density="compact" class="mt-4">
+          <v-alert v-if="mapState.formLoading && auth.canWrite" type="info" variant="tonal" density="compact" class="mt-4">
             Carregando dados da solicitação e anexos...
           </v-alert>
-          <v-alert v-if="media.applicationFormsError && auth.canWrite" type="warning" variant="tonal" density="compact" class="mt-4">
-            {{ media.applicationFormsError }}
-            <v-btn variant="text" size="small" @click="media.loadApplicationFormsForMap()">Tentar novamente</v-btn>
+          <v-alert v-if="mapState.formError && auth.canWrite" type="warning" variant="tonal" density="compact" class="mt-4">
+            {{ mapState.formError }}
+            <v-btn variant="text" size="small" @click="mapState.refreshSelected(auth.canWrite)">Tentar novamente</v-btn>
           </v-alert>
 
           <h4 v-if="selectedForm || selectedAsset.company_responsible || selectedAsset.contact_name || selectedAsset.contact_email" class="detail-section-title">Requerente / empresa</h4>
@@ -314,7 +320,7 @@
 
         <div v-else class="empty-state compact analysis-card-empty">
           <v-icon icon="mdi-map-marker-question-outline" size="44" />
-          <span>Selecione um marcador no mapa para analisar.</span>
+          <span>{{ mapState.selectedLoading ? 'Carregando veículo...' : 'Selecione um marcador no mapa para analisar.' }}</span>
         </div>
       </v-card>
     </aside>
@@ -336,6 +342,7 @@
 <script setup lang="ts">
 import L from 'leaflet';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 import {
   DECISION_STATUS_OPTIONS,
@@ -350,19 +357,22 @@ import {
   statusColor,
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
+import { useMapStore } from '../stores/map';
 import { useAuthStore } from '../stores/auth';
 import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
-import { companyFilterOptions as getCompanyFilterOptions, companyKey } from '../utils/company-filter';
 import { formatDate, formatDateTime } from '../utils/format';
+import { clusterZoom, createViewportScheduler, readMapViewport } from '../utils/map-viewport';
 
 const CAMPO_GRANDE_CENTER: [number, number] = [-20.464, -54.612];
 const PUBLIC_PROPERTIES_URL = `${import.meta.env.BASE_URL}mapas/imoveis-publicos.geojson`;
 const PUBLIC_PROPERTIES_COLOR = '#f57c00';
 
 const media = useMediaStore();
+const mapState = useMapStore();
 const auth = useAuthStore();
+const route = useRoute();
 const mapElement = ref<HTMLElement | null>(null);
 const sideStack = ref<HTMLElement | null>(null);
 const detailScrollElement = ref<HTMLElement | null>(null);
@@ -384,8 +394,12 @@ let assetLayer: L.LayerGroup | null = null;
 let publicPropertiesLayer: L.GeoJSON | null = null;
 let publicPropertiesRenderer: L.Canvas | null = null;
 let publicPropertiesRequest: AbortController | null = null;
+const viewportScheduler = createViewportScheduler(loadViewport);
 
-const companyFilterOptions = computed(() => getCompanyFilterOptions(media.assets));
+const companyFilterOptions = computed(() => [
+  { title: 'Todas as empresas', value: 'all' },
+  ...mapState.companyOptions.map((name) => ({ title: name, value: name })),
+]);
 
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
@@ -403,14 +417,8 @@ const statusFilterOptions = computed(() => [
   ...STATUS_OPTIONS,
 ]);
 
-const filteredAssets = computed(() => media.assets.filter((asset) => (
-  (companyFilter.value === 'all' || companyKey(asset) === companyFilter.value)
-  && (typeFilter.value === 'all' || asset.media_type === typeFilter.value)
-  && (statusFilter.value === 'all' || asset.status === statusFilter.value)
-)));
-
-const selectedAsset = computed(() => media.selectedAsset);
-const selectedForm = computed(() => media.selectedApplicationForm);
+const selectedAsset = computed(() => mapState.selectedAsset);
+const selectedForm = computed(() => mapState.selectedForm);
 const formImages = computed(() => selectedForm.value?.attachments.filter((item) => item.content_type.startsWith('image/')) ?? []);
 const formDocuments = computed(() => selectedForm.value?.attachments.filter((item) => !item.content_type.startsWith('image/')) ?? []);
 const selectedAttachmentLinks = computed(() => [...new Set([
@@ -422,14 +430,20 @@ const analysis = computed(() => (
   selectedAsset.value ? media.analysisByAssetId[selectedAsset.value.id] : null
 ));
 
-watch(filteredAssets, renderAssets, { deep: true });
+watch(() => [mapState.items, mapState.clusters, mapState.selectedAssetId], renderAssets);
+
+watch([companyFilter, typeFilter, statusFilter], scheduleViewportLoad);
+
+watch(() => route.query.asset, (id) => {
+  if (typeof id === 'string' && id !== mapState.selectedAssetId) void mapState.selectAsset(id, auth.canWrite);
+});
 
 watch(companyFilterOptions, (options) => {
   if (options.some((option) => option.value === companyFilter.value)) return;
   companyFilter.value = 'all';
 });
 
-watch(() => media.selectedAssetId, async () => {
+watch(() => mapState.selectedAssetId, async () => {
   renderAssets();
   await nextTick();
   if (detailScrollElement.value) detailScrollElement.value.scrollTop = 0;
@@ -437,6 +451,11 @@ watch(() => media.selectedAssetId, async () => {
 
 watch(selectedAsset, (asset) => {
   if (!asset) return;
+  if (asset.status === 'novos processos') {
+    delete media.analysisByAssetId[asset.id];
+  } else {
+    void media.analyzeAsset(asset.id).catch(() => undefined);
+  }
   mode.value = 'analysis';
   reviewStatus.value = asset.status === 'novos processos' ? 'análise' : asset.status;
   reviewJustification.value = asset.justification ?? '';
@@ -445,7 +464,8 @@ watch(selectedAsset, (asset) => {
 }, { immediate: true });
 
 onMounted(async () => {
-  if (auth.canWrite) void media.loadApplicationFormsForMap(true);
+  void mapState.loadCompanyOptions();
+  window.addEventListener('geomidia:map-refresh', refreshMap);
   await nextTick();
   if (!mapElement.value) return;
   if (sideStack.value) L.DomEvent.disableScrollPropagation(sideStack.value);
@@ -471,15 +491,20 @@ onMounted(async () => {
 
   assetLayer = L.layerGroup().addTo(map);
   map.on('click', handleMapClick);
+  map.on('moveend zoomend', scheduleViewportLoad);
   renderAssets();
-  if (selectedAsset.value) {
-    focusAsset(selectedAsset.value);
-  }
-
-  setTimeout(() => map?.invalidateSize(), 120);
+  const queryAsset = route.query.asset;
+  if (typeof queryAsset === 'string') void mapState.selectAsset(queryAsset, auth.canWrite);
+  setTimeout(() => {
+    map?.invalidateSize();
+    scheduleViewportLoad();
+  }, 120);
 });
 
 onUnmounted(() => {
+  viewportScheduler.cancel();
+  window.removeEventListener('geomidia:map-refresh', refreshMap);
+  mapState.invalidate();
   publicPropertiesRequest?.abort();
   map?.remove();
   map = null;
@@ -537,6 +562,35 @@ function addPublicPropertiesLegend() {
   legend.addTo(map);
 }
 
+function currentViewport() {
+  return map ? readMapViewport(map) : null;
+}
+
+function loadViewport() {
+  const viewport = currentViewport();
+  if (!viewport) return;
+  void mapState.loadViewport(viewport, currentFilters());
+}
+
+function currentFilters() {
+  return {
+    company: companyFilter.value === 'all' ? undefined : companyFilter.value,
+    mediaType: typeFilter.value === 'all' ? undefined : typeFilter.value,
+    status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+  };
+}
+
+function scheduleViewportLoad() {
+  const viewport = currentViewport();
+  if (!viewport) return;
+  mapState.stageViewport(viewport, currentFilters());
+  viewportScheduler.schedule();
+}
+
+function refreshMap() {
+  viewportScheduler.flush();
+}
+
 function blankDraft(): MediaAssetInput {
   return {
     media_type: 'outdoor',
@@ -587,22 +641,40 @@ function renderAssets() {
   if (!assetLayer) return;
   assetLayer.clearLayers();
 
-  filteredAssets.value.forEach((asset) => {
+  if (mapState.tooMany) {
+    mapState.clusters.forEach((cluster) => {
+      const icon = L.divIcon({
+        className: 'map-cluster-icon',
+        html: `<span>${cluster.count}</span>`,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+      });
+      L.marker([cluster.latitude, cluster.longitude], { icon, title: `${cluster.count} veículos nesta região` })
+        .on('click', (event) => {
+          event.originalEvent.stopPropagation();
+          map?.setView([cluster.latitude, cluster.longitude], clusterZoom(map?.getZoom() ?? 0));
+        })
+        .addTo(assetLayer!);
+    });
+    return;
+  }
+
+  mapState.items.forEach((asset) => {
     const color = mediaTypeColor(asset.media_type);
     const latLng: L.LatLngExpression = [asset.latitude, asset.longitude];
 
     const radiusCircle = L.circle(latLng, {
       radius: asset.radius_meters,
-      color: asset.id === media.selectedAssetId ? '#b42318' : color,
+      color: asset.id === mapState.selectedAssetId ? '#b42318' : color,
       fillColor: color,
-      fillOpacity: asset.id === media.selectedAssetId ? 0.16 : 0.08,
-      weight: asset.id === media.selectedAssetId ? 2 : 1,
+      fillOpacity: asset.id === mapState.selectedAssetId ? 0.16 : 0.08,
+      weight: asset.id === mapState.selectedAssetId ? 2 : 1,
     })
       .on('click', (event) => selectMapAsset(asset.id, event))
       .addTo(assetLayer!);
 
     const pointMarker = L.circleMarker(latLng, {
-      radius: asset.id === media.selectedAssetId ? 9 : 7,
+      radius: asset.id === mapState.selectedAssetId ? 9 : 7,
       color: '#ffffff',
       weight: 2,
       fillColor: color,
@@ -620,7 +692,7 @@ function renderAssets() {
 function selectMapAsset(assetId: string, event: L.LeafletMouseEvent) {
   event.originalEvent.stopPropagation();
   mode.value = 'analysis';
-  media.selectAsset(assetId);
+  void mapState.selectAsset(assetId, auth.canWrite);
 }
 
 function handleMapClick(event: L.LeafletMouseEvent) {
@@ -630,7 +702,7 @@ function handleMapClick(event: L.LeafletMouseEvent) {
     longitude: Number(event.latlng.lng.toFixed(6)),
     address: `Ponto capturado (${event.latlng.lat.toFixed(4)}, ${event.latlng.lng.toFixed(4)})`,
   });
-  media.selectAsset(null);
+  void mapState.selectAsset(null, auth.canWrite);
   renderAssets();
   mode.value = 'form';
 }
@@ -666,6 +738,8 @@ async function saveDraft() {
     });
     Object.assign(draft, blankDraft());
     mode.value = 'analysis';
+    refreshMap();
+    void mapState.loadCompanyOptions();
   } catch {
     // O store publica o erro no alerta global.
   }
@@ -679,6 +753,8 @@ async function saveDecision() {
       justification: reviewJustification.value || null,
       attachment_links: joinAttachmentLinks(reviewAttachmentLinks.value) || null,
     });
+    await mapState.refreshSelected(auth.canWrite);
+    refreshMap();
   } catch {
     // O store publica conflitos e erros no alerta global.
   }
@@ -688,6 +764,8 @@ async function startSelectedAnalysis() {
   if (!selectedAsset.value || selectedAsset.value.status !== 'novos processos') return;
   try {
     await media.startAnalysis(selectedAsset.value.id);
+    await mapState.refreshSelected(auth.canWrite);
+    refreshMap();
   } catch {
     // O store publica o erro no alerta global.
   }
@@ -697,6 +775,9 @@ async function deleteSelected() {
   if (!selectedAsset.value) return;
   try {
     await media.deleteAsset(selectedAsset.value.id);
+    void mapState.selectAsset(null, auth.canWrite);
+    refreshMap();
+    void mapState.loadCompanyOptions();
     confirmDelete.value = false;
   } catch {
     // O store publica o erro no alerta global.

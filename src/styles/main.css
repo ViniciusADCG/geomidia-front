@@ -1130,6 +1130,20 @@ body {
   width: 100%;
 }
 
+.map-cluster-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #145c91;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(14, 40, 62, 0.35);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .public-properties-legend {
   display: flex;
   align-items: center;
