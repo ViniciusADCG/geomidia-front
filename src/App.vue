@@ -50,11 +50,11 @@
 
       <admin-topbar
         :show-menu="display.smAndDown.value"
-        :loading="media.loading"
+        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading)"
         :role-label="roleLabel"
         :user-name="auth.userName"
         @toggle-menu="drawer = !drawer"
-        @refresh="media.loadAll"
+        @refresh="refreshCurrentView"
       />
 
       <v-main class="app-main">
@@ -156,6 +156,11 @@ onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnau
 
 function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'forms' | 'requirements' | 'users' | 'rules') {
   void router.push({ name: view });
+}
+
+function refreshCurrentView() {
+  void media.loadAll();
+  if (route.name === 'inventory') void media.refreshInventory();
 }
 
 function handleViewOnMap(id: string) {
