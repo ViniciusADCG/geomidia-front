@@ -91,6 +91,43 @@ export interface MediaAsset {
   updated_at: string;
 }
 
+export interface MapViewport {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  zoom: number;
+}
+
+export interface MapFilters {
+  mediaType?: MediaType;
+  status?: MediaStatus;
+  company?: string;
+}
+
+export type MapAssetSummary = Pick<MediaAsset,
+  'id' | 'latitude' | 'longitude' | 'radius_meters' | 'media_type' | 'status'
+  | 'process_code' | 'official_process_code' | 'company_responsible' | 'contact_name'>;
+
+export interface MapAssetPage {
+  items: MapAssetSummary[];
+  total: number;
+  too_many: boolean;
+  max_items: number;
+}
+
+export interface MapCluster {
+  id: string;
+  count: number;
+  latitude: number;
+  longitude: number;
+}
+
+export interface MapClusterPage {
+  clusters: MapCluster[];
+  total: number;
+}
+
 export type MediaAssetInput = Omit<MediaAsset, 'id' | 'process_code' | 'radius_meters' | 'created_at' | 'updated_at'>;
 
 export interface ApplicationFormAttachment {
