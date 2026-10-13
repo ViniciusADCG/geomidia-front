@@ -5,6 +5,8 @@ import type {
   ConflictAnalysis,
   ExpirationOverview,
   LoginResponse,
+  LinkedApplicationFormResult,
+  LinkedApplicationFormUpdate,
   MediaAsset,
   MediaAssetInput,
   MediaRule,
@@ -195,6 +197,11 @@ export const api = {
   },
   updateApplicationForm(id: string, input: Partial<ApplicationFormInput>) {
     return request<ApplicationForm>(`/application-forms/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  updateLinkedApplicationForm(id: string, input: LinkedApplicationFormUpdate) {
+    return request<LinkedApplicationFormResult>(`/application-forms/${id}/linked`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    });
   },
   deleteApplicationForm(id: string) {
     return request<void>(`/application-forms/${id}`, { method: 'DELETE' });
