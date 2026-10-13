@@ -275,7 +275,7 @@
             <v-alert v-if="editingId && media.applicationFormsLoading" type="info" density="compact" variant="tonal" class="span-2">Carregando solicitação e anexos...</v-alert>
             <v-alert v-if="editingId && media.applicationFormsError" type="warning" density="compact" variant="tonal" class="span-2">
               {{ media.applicationFormsError }}
-              <v-btn variant="text" size="small" @click="media.loadApplicationFormsForMap(true)">Tentar novamente</v-btn>
+              <v-btn variant="text" size="small" @click="retrySelectedForm">Tentar novamente</v-btn>
             </v-alert>
             <div v-if="selectedForm?.attachments.length" class="form-attachment-list span-2">
               <div v-for="attachment in selectedForm.attachments" :key="attachment.id" class="form-attachment-item">
@@ -562,7 +562,11 @@ function openEditDialog(asset: MediaAsset) {
   });
   resetAttachmentLinks(asset.attachment_links);
   dialog.value = true;
-  void media.loadApplicationFormsForMap(true);
+  void media.loadApplicationFormForInventory(asset.id);
+}
+
+function retrySelectedForm() {
+  if (editingId.value) void media.loadApplicationFormForInventory(editingId.value);
 }
 
 async function openUploadedAttachment(attachment: ApplicationFormAttachment) {

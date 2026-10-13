@@ -285,7 +285,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { api } from '../services/api';
@@ -349,7 +349,11 @@ const filteredForms = computed(() => {
   ].some((value) => value.toLocaleLowerCase('pt-BR').includes(term)));
 });
 
-onMounted(loadForms);
+onMounted(() => {
+  window.addEventListener('geomidia:forms-refresh', loadForms);
+  void loadForms();
+});
+onUnmounted(() => window.removeEventListener('geomidia:forms-refresh', loadForms));
 
 function blankForm(): ApplicationFormInput {
   return {
@@ -483,7 +487,7 @@ async function save() {
     )) as Partial<ApplicationFormInput>;
     await api.updateApplicationForm(editingId.value, changes);
     showMessage('Solicitação e ponto atualizados com sucesso.', 'success');
-    await Promise.all([loadForms(), media.loadAll(true)]);
+    await loadForms();
     dialog.value = false;
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao salvar a solicitação.', 'error');
@@ -498,7 +502,7 @@ async function confirmDelete() {
   try {
     await api.deleteApplicationForm(deleteTarget.value.id);
     deleteTarget.value = null;
-    await Promise.all([loadForms(), media.loadAll(true)]);
+    await loadForms();
     showMessage('Solicitação e ponto removidos do sistema.', 'success');
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir a solicitação.', 'error');

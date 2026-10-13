@@ -183,7 +183,14 @@ function refreshCurrentView() {
     void media.refreshInventory();
     void media.loadRules();
   }
-  if (route.name === 'forms' || route.name === 'rules') void media.loadRules();
+  if (route.name === 'forms') {
+    window.dispatchEvent(new Event('geomidia:forms-refresh'));
+    void media.loadRules();
+  }
+  if (route.name === 'rules') window.dispatchEvent(new Event('geomidia:rules-refresh'));
+  if (route.name === 'expirations') window.dispatchEvent(new Event('geomidia:expirations-refresh'));
+  if (route.name === 'requirements') window.dispatchEvent(new Event('geomidia:requirements-refresh'));
+  if (route.name === 'users') window.dispatchEvent(new Event('geomidia:users-refresh'));
 }
 
 function loadRouteData(name: string | symbol | null | undefined) {

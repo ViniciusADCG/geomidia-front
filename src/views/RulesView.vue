@@ -156,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { MEDIA_TYPE_OPTIONS, mediaTypeLabel } from '../domain/rules';
 import { api } from '../services/api';
@@ -182,7 +182,11 @@ const availableMediaTypes = computed(() => (
   MEDIA_TYPE_OPTIONS.filter((option) => !rules.value.some((rule) => rule.media_type === option.value))
 ));
 
-onMounted(loadRules);
+onMounted(() => {
+  window.addEventListener('geomidia:rules-refresh', loadRules);
+  void loadRules();
+});
+onUnmounted(() => window.removeEventListener('geomidia:rules-refresh', loadRules));
 
 function blankForm(): RuleForm {
   return {
@@ -250,7 +254,6 @@ async function save() {
       await api.createMediaRule(payload);
     }
     await loadRules();
-    await media.loadAll(true);
     dialog.value = false;
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : 'Falha ao salvar a regra.';
