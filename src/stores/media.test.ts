@@ -10,6 +10,7 @@ vi.mock('../services/api', () => ({
     listApplicationForms: vi.fn(),
     analyzeMediaAsset: vi.fn(),
     updateApplicationForm: vi.fn(),
+    updateLinkedApplicationForm: vi.fn(),
     updateMediaAsset: vi.fn(),
     getMediaAsset: vi.fn(),
     listMediaAssets: vi.fn(),
@@ -263,9 +264,7 @@ describe('detalhes do ativo selecionado no mapa', () => {
       ...asset('forms'), company_responsible: 'Empresa Atualizada',
       official_process_code: '12345/2026',
     };
-    vi.mocked(api.updateApplicationForm).mockResolvedValue(updatedForm);
-    vi.mocked(api.updateMediaAsset).mockResolvedValue(updatedAsset);
-    vi.mocked(api.getMediaAsset).mockResolvedValue(updatedAsset);
+    vi.mocked(api.updateLinkedApplicationForm).mockResolvedValue({ form: updatedForm, asset: updatedAsset });
     vi.mocked(api.listActivities).mockResolvedValue({ items: [], total: 0, limit: 30, offset: 0 });
     vi.mocked(api.getMediaStats).mockResolvedValue({
       total: 1, new_processes: 1, pending: 0, approved: 0, rejected: 0,
@@ -276,11 +275,58 @@ describe('detalhes do ativo selecionado no mapa', () => {
       company_responsible: 'Empresa Atualizada',
     }, { official_process_code: '12345/2026' });
 
-    expect(api.updateApplicationForm).toHaveBeenCalledWith('form-forms', { company_responsible: 'Empresa Atualizada' });
-    expect(api.updateMediaAsset).toHaveBeenCalledWith('forms', { official_process_code: '12345/2026' });
+    expect(api.updateLinkedApplicationForm).toHaveBeenCalledWith('form-forms', {
+      form: { company_responsible: 'Empresa Atualizada' },
+      asset: { official_process_code: '12345/2026' },
+    });
+    expect(api.updateApplicationForm).not.toHaveBeenCalled();
+    expect(api.updateMediaAsset).not.toHaveBeenCalled();
+    expect(api.getMediaAsset).not.toHaveBeenCalled();
+    expect(api.listActivities).toHaveBeenCalledTimes(1);
+    expect(api.getMediaStats).toHaveBeenCalledTimes(1);
     expect(store.assets[0].process_code).toBe('PROC-forms');
     expect(store.assets[0].official_process_code).toBe('12345/2026');
     expect(store.applicationForms[0].company_responsible).toBe('Empresa Atualizada');
+  });
+
+  it('falha atômica mantém formulário e ativo locais e informa erro sem PATCH de recuperação', async () => {
+    const store = useMediaStore();
+    store.assets = [asset('forms')];
+    store.applicationForms = [form('forms')];
+    vi.mocked(api.updateLinkedApplicationForm).mockRejectedValue(new Error('Falha na gravação'));
+
+    await expect(store.updateLinkedAsset('forms', 'form-forms', {
+      company_responsible: 'Empresa Nova',
+    }, { official_process_code: '12345/2026' })).rejects.toThrow('Falha na gravação');
+
+    expect(store.assets[0].official_process_code).toBeUndefined();
+    expect(store.applicationForms[0].company_responsible).toBe('Empresa Exemplo');
+    expect(store.error).toBe('Falha na gravação');
+    expect(store.saving).toBe(false);
+    expect(api.updateApplicationForm).not.toHaveBeenCalled();
+    expect(api.updateMediaAsset).not.toHaveBeenCalled();
+    expect(api.getMediaAsset).not.toHaveBeenCalled();
+    expect(api.listApplicationForms).not.toHaveBeenCalled();
+  });
+
+  it('salva com uma chamada e aceita refresh posterior', async () => {
+    const store = useMediaStore();
+    store.assets = [asset('forms')];
+    store.applicationForms = [form('forms')];
+    const savedAsset = { ...asset('forms'), official_process_code: '999/2026' };
+    vi.mocked(api.updateLinkedApplicationForm).mockResolvedValue({ form: form('forms'), asset: savedAsset });
+    vi.mocked(api.listActivities).mockResolvedValue({ items: [], total: 0, limit: 30, offset: 0 });
+    vi.mocked(api.getMediaStats).mockResolvedValue(stats(1));
+    vi.mocked(api.listMediaAssets).mockResolvedValue(page('forms'));
+    vi.mocked(api.listMediaRules).mockResolvedValue([]);
+
+    await store.updateLinkedAsset('forms', 'form-forms', {}, { official_process_code: '999/2026' });
+    expect(store.assets[0].official_process_code).toBe('999/2026');
+    await store.loadAll(true);
+    expect(api.updateLinkedApplicationForm).toHaveBeenCalledTimes(1);
+    expect(api.listMediaAssets).toHaveBeenCalledTimes(1);
+    expect(store.loading).toBe(false);
+    expect(store.saving).toBe(false);
   });
 
   it('associa o formulário e os anexos ao ativo vindo do FORMS GEO', async () => {

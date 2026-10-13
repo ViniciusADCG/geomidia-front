@@ -344,7 +344,7 @@ import {
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
-import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { formatCoordinate, formatDate, formatDateTime } from '../utils/format';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
@@ -568,8 +568,12 @@ async function save() {
           expiration_date: formDetails.expiration_date || null,
         };
         const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
-          ([key, value]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
-        )) as Partial<ApplicationFormInput>;
+          ([key, value]) => [
+            'company_responsible', 'company_cnpj', 'municipal_registration', 'property_registration',
+            'street', 'number', 'district', 'postal_code', 'latitude', 'longitude', 'media_type',
+            'number_of_faces', 'expiration_date', 'requester_email',
+          ].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
+        )) as LinkedApplicationFormUpdate['form'];
         const assetPayload = {
           official_process_code: form.official_process_code?.trim() || null,
           width_m: form.width_m || null,
@@ -581,7 +585,7 @@ async function save() {
         };
         const assetChanges = Object.fromEntries(Object.entries(assetPayload).filter(
           ([key, value]) => value !== editingAsset.value?.[key as keyof MediaAsset],
-        )) as Partial<MediaAssetInput>;
+        )) as LinkedApplicationFormUpdate['asset'];
         if (Object.keys(formChanges).length || Object.keys(assetChanges).length) {
           await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
         }
