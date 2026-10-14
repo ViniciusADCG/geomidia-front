@@ -51,7 +51,7 @@
               <th>Endereço</th>
               <th>Bairro</th>
               <th>Tipo</th>
-              <th class="text-center">Raio</th>
+              <th class="text-center">Raio registrado</th>
               <th>Coordenadas</th>
               <th>Vencimento</th>
               <th>Status</th>
@@ -166,7 +166,8 @@
           {{ editingId ? 'Editar Cadastro' : 'Novo Cadastro de Veículo' }}
         </v-card-title>
         <v-card-subtitle>
-          Raio calculado: {{ calculatedRadius }}m
+          <template v-if="editingAsset">Raio registrado: {{ editingAsset.radius_meters }}m</template>
+          <template v-else>Raio pela regra atual: {{ calculatedRadius }}m</template>
         </v-card-subtitle>
 
         <v-card-text>
@@ -249,7 +250,11 @@
               persistent-hint
             />
             <v-text-field v-if="selectedForm" v-model="formDetails.number_of_faces" label="Quantidade de faces" />
-            <v-text-field v-if="editingAsset" :model-value="`${calculatedRadius} m`" label="Raio calculado" readonly />
+            <v-text-field v-if="editingAsset" :model-value="`${editingAsset.radius_meters} m`" label="Raio registrado" readonly />
+            <v-text-field v-if="editingAsset && currentRadiusAvailable" :model-value="`${calculatedRadius} m`" label="Raio pela regra atual (prévia)" readonly />
+            <v-alert v-if="editingAsset && !currentRadiusAvailable" type="warning" variant="tonal" class="span-2">
+              A classificação histórica não permite calcular com segurança o raio pela regra atual.
+            </v-alert>
             <h4 class="form-section-title span-2">Análise</h4>
             <v-text-field
               v-if="!editingId || form.status === 'novos processos'"
@@ -338,9 +343,33 @@
         </v-card-text>
 
         <v-card-actions>
+          <v-btn v-if="editingAsset && auth.canDelete" variant="text" @click="openRadiusReassessment">Reavaliar raio</v-btn>
           <v-spacer />
           <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
           <v-btn color="primary" :loading="media.saving" :disabled="!formValid || (Boolean(editingId) && !media.applicationFormsLoaded)" @click="save">Salvar Cadastro</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="reassessmentDialog" max-width="560">
+      <v-card title="Reavaliação administrativa do raio">
+        <v-card-text>
+          <v-progress-circular v-if="reassessmentLoading" indeterminate />
+          <v-alert v-if="reassessmentError" type="error" variant="tonal">{{ reassessmentError }}</v-alert>
+          <template v-if="reassessmentPreview">
+            <p>Raio registrado: {{ reassessmentPreview.registered_radius_meters }} m</p>
+            <p>Raio pela regra atual: {{ reassessmentPreview.current_radius_meters == null ? 'indisponível' : `${reassessmentPreview.current_radius_meters} m` }}</p>
+            <p>Condição usada: {{ reassessmentPreview.condition }}</p>
+            <v-alert v-if="!reassessmentPreview.can_reassess" type="warning" variant="tonal">
+              {{ reassessmentPreview.reason_unavailable }}
+            </v-alert>
+            <v-textarea v-else v-model="reassessmentReason" label="Motivo da reavaliação" :rules="[(value) => validReassessmentReason(String(value ?? '')) || 'Informe ao menos 10 caracteres.']" />
+          </template>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="reassessmentDialog = false">Cancelar</v-btn>
+          <v-btn color="primary" :loading="reassessmentLoading" :disabled="!reassessmentPreview?.can_reassess || !validReassessmentReason(reassessmentReason)" @click="confirmRadiusReassessment">Confirmar reavaliação</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -370,6 +399,8 @@ import {
   MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
   getRequiredRadius,
+  canPreviewCurrentRadius,
+  validReassessmentReason,
   mediaTypeOptionsFromRules,
   mediaTypeLabel,
   statusLabel,
@@ -377,7 +408,8 @@ import {
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useAuthStore } from '../stores/auth';
-import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput } from '../types';
+import { api } from '../services/api';
+import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, RadiusReassessmentPreview } from '../types';
 import { formatCoordinate, formatDate, formatDateTime } from '../utils/format';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
@@ -389,6 +421,11 @@ const auth = useAuthStore();
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const editingAsset = ref<MediaAsset | null>(null);
+const reassessmentDialog = ref(false);
+const reassessmentLoading = ref(false);
+const reassessmentError = ref('');
+const reassessmentReason = ref('');
+const reassessmentPreview = ref<RadiusReassessmentPreview | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
 const formValid = ref(false);
 const attachmentLinkDraft = ref('');
@@ -444,6 +481,46 @@ const deleteDialog = computed({
 const calculatedRadius = computed(() => getRequiredRadius(
   editable.value.media_type, editable.value.area_m2, media.rules, editable.value.area_rule_classification,
 ));
+const currentRadiusAvailable = computed(() => canPreviewCurrentRadius(
+  editable.value.media_type, editable.value.area_m2, media.rules,
+));
+
+async function openRadiusReassessment() {
+  if (!editingAsset.value || auth.role !== 'admin') return;
+  reassessmentDialog.value = true;
+  reassessmentPreview.value = null;
+  reassessmentReason.value = '';
+  reassessmentError.value = '';
+  reassessmentLoading.value = true;
+  try {
+    reassessmentPreview.value = await api.previewRadiusReassessment(editingAsset.value.id);
+  } catch (error) {
+    reassessmentError.value = error instanceof Error ? error.message : 'Falha ao carregar a prévia.';
+  } finally {
+    reassessmentLoading.value = false;
+  }
+}
+
+async function confirmRadiusReassessment() {
+  const preview = reassessmentPreview.value;
+  if (!editingAsset.value || !preview?.can_reassess || !preview.rule_updated_at || !validReassessmentReason(reassessmentReason.value)) return;
+  reassessmentLoading.value = true;
+  reassessmentError.value = '';
+  try {
+    const updated = await api.confirmRadiusReassessment(editingAsset.value.id, {
+      reason: reassessmentReason.value.trim(),
+      expected_registered_radius_meters: preview.registered_radius_meters,
+      expected_rule_updated_at: preview.rule_updated_at,
+    });
+    editingAsset.value = updated;
+    reassessmentDialog.value = false;
+    await media.refreshInventory();
+  } catch (error) {
+    reassessmentError.value = error instanceof Error ? error.message : 'Falha ao confirmar a reavaliação.';
+  } finally {
+    reassessmentLoading.value = false;
+  }
+}
 
 function blankForm(): MediaAssetInput {
   return {

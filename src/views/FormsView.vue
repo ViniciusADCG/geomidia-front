@@ -226,7 +226,9 @@
               persistent-hint
             />
             <v-alert color="primary" variant="tonal" density="compact" class="span-2">
-              Raio calculado para o ponto: {{ calculatedRadius }}m
+              Raio registrado: {{ registeredRadius == null ? 'carregando ou indisponível' : `${registeredRadius}m` }}.
+              <template v-if="currentRadiusAvailable"> Raio pela regra atual (prévia): {{ calculatedRadius }}m.</template>
+              <template v-else> A classificação histórica não permite uma prévia segura pela regra atual.</template>
             </v-alert>
 
             <v-text-field
@@ -327,6 +329,7 @@ import { api } from '../services/api';
 import {
   DISTRICT_OPTIONS,
   getRequiredRadius,
+  canPreviewCurrentRadius,
   mediaTypeLabel,
   mediaTypeOptionsFromRules,
   statusColor,
@@ -355,6 +358,7 @@ const messageType = ref<'success' | 'error' | 'info'>('success');
 const attachmentDraft = ref('');
 const attachmentLinks = ref<string[]>([]);
 const uploadedAttachments = ref<ApplicationFormAttachment[]>([]);
+const registeredRadius = ref<number | null>(null);
 const form = reactive<ApplicationFormInput>(blankForm());
 
 const required = (value: string) => Boolean(String(value ?? '').trim()) || 'Campo obrigatório.';
@@ -370,6 +374,7 @@ const coordinateRule = (min: number, max: number, label: string) => (value: numb
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
 const calculatedRadius = computed(() => getRequiredRadius(form.media_type, form.area_m2, media.rules, form.area_rule_classification));
+const currentRadiusAvailable = computed(() => canPreviewCurrentRadius(form.media_type, form.area_m2, media.rules));
 onMounted(() => {
   window.addEventListener('geomidia:forms-refresh', formList.load);
   void formList.load();
@@ -404,6 +409,12 @@ function blankForm(): ApplicationFormInput {
 
 function openEdit(item: ApplicationForm) {
   editingId.value = item.id;
+  registeredRadius.value = null;
+  void api.getMediaAsset(item.asset_id).then((asset) => {
+    if (editingId.value === item.id) registeredRadius.value = asset.radius_meters;
+  }).catch(() => {
+    if (editingId.value === item.id) showMessage('Não foi possível carregar o raio registrado.', 'error');
+  });
   Object.assign(form, {
     company_responsible: item.company_responsible,
     company_cnpj: item.company_cnpj ?? null,

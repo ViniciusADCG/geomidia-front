@@ -20,7 +20,7 @@
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact">
-      Ao salvar uma alteração de raio, todos os veículos já cadastrados daquele tipo são recalculados automaticamente.
+      Alterações nesta regra serão aplicadas a novos cadastros. Ativos existentes mantêm o raio já registrado até uma reavaliação administrativa.
     </v-alert>
 
     <v-card border>

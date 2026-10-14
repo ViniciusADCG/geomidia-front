@@ -18,6 +18,7 @@ import type {
   MediaStats,
   MediaStatus,
   MediaType,
+  RadiusReassessmentPreview,
   Page,
   RequirementResponse,
   User,
@@ -183,6 +184,16 @@ export const api = {
   },
   updateMediaAsset(id: string, input: Partial<MediaAssetInput>) {
     return request<MediaAsset>(`/media-assets/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  previewRadiusReassessment(id: string) {
+    return request<RadiusReassessmentPreview>(`/media-assets/${id}/radius-reassessment`);
+  },
+  confirmRadiusReassessment(id: string, input: {
+    reason: string; expected_registered_radius_meters: number; expected_rule_updated_at: string;
+  }) {
+    return request<MediaAsset>(`/media-assets/${id}/radius-reassessment`, {
+      method: 'POST', body: JSON.stringify(input),
+    });
   },
   deleteMediaAsset(id: string) {
     return request<void>(`/media-assets/${id}`, { method: 'DELETE' });
