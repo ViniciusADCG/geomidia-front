@@ -226,8 +226,23 @@ export const api = {
   deleteMediaRule(id: string) {
     return request<void>(`/media-rules/${id}`, { method: 'DELETE' });
   },
-  listApplicationForms(search = '') {
-    return request<ApplicationForm[]>(`/application-forms${queryString({ search })}`);
+  async listApplicationForms(params: { search?: string; limit?: number; offset?: number } = {}): Promise<Page<ApplicationForm>> {
+    const result = await request<Page<ApplicationForm> | ApplicationForm[]>(`/application-forms${queryString(params)}`);
+    if (!Array.isArray(result)) return result;
+
+    const term = params.search?.trim().toLocaleLowerCase('pt-BR');
+    const filtered = term ? result.filter((item) => [
+      item.process_code,
+      item.company_responsible,
+      item.company_cnpj ?? '',
+      item.municipal_registration,
+      item.property_registration,
+      item.street,
+      item.district,
+    ].some((value) => value.toLocaleLowerCase('pt-BR').includes(term))) : result;
+    const offset = params.offset ?? 0;
+    const limit = params.limit ?? filtered.length;
+    return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset };
   },
   getApplicationFormByAsset(assetId: string) {
     return request<ApplicationForm>(`/application-forms/by-asset/${assetId}`);
