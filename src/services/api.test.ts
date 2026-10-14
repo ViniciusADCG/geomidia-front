@@ -154,3 +154,25 @@ describe('API espacial do Mapa', () => {
     ]);
   });
 });
+
+describe('reavaliação individual de raio', () => {
+  it('busca prévia e confirma somente o ativo escolhido com motivo e valores esperados', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, ok: true, json: async () => ({}) }));
+    await api.previewRadiusReassessment('asset-1');
+    await api.confirmRadiusReassessment('asset-1', {
+      reason: 'Área real conferida no processo',
+      expected_registered_radius_meters: 250,
+      expected_rule_updated_at: '2026-10-14T10:00:00Z',
+    });
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.map((call) => new URL(call[0] as string).pathname)).toEqual([
+      '/api/media-assets/asset-1/radius-reassessment',
+      '/api/media-assets/asset-1/radius-reassessment',
+    ]);
+    expect(calls[0][1]?.method).toBeUndefined();
+    expect(calls[1][1]?.method).toBe('POST');
+    expect(JSON.parse(String(calls[1][1]?.body))).toMatchObject({
+      reason: 'Área real conferida no processo', expected_registered_radius_meters: 250,
+    });
+  });
+});

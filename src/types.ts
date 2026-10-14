@@ -91,6 +91,20 @@ export interface MediaAsset {
   updated_at: string;
 }
 
+export interface RadiusReassessmentPreview {
+  asset_id: string;
+  registered_radius_meters: number;
+  current_radius_meters: number | null;
+  condition: string;
+  can_reassess: boolean;
+  reason_unavailable: string | null;
+  rule_id: string | null;
+  rule_updated_at: string | null;
+  rule_base_radius_meters: number | null;
+  rule_area_threshold_m2: number | null;
+  rule_radius_above_threshold_meters: number | null;
+}
+
 export interface MapViewport {
   north: number;
   south: number;
