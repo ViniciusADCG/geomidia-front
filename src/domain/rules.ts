@@ -456,6 +456,15 @@ export function getRequiredRadius(
   return 80;
 }
 
+export function canPreviewCurrentRadius(mediaType: MediaType, areaM2: number | null, rules: MediaRule[]): boolean {
+  const rule = rules.find((item) => item.media_type === mediaType && item.is_active);
+  return Boolean(rule && (rule.area_threshold_m2 == null || areaM2 != null));
+}
+
+export function validReassessmentReason(reason: string): boolean {
+  return reason.trim().length >= 10;
+}
+
 export function mediaTypeLabel(mediaType: MediaType): string {
   return MEDIA_TYPE_OPTIONS.find((item) => item.value === mediaType)?.title ?? mediaType;
 }
