@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { advanceSessionEpoch, api, ApiError } from './api';
+import type { ApplicationForm } from '../types';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -75,6 +76,53 @@ describe('listagem paginada de solicitações recebidas', () => {
     const url = new URL(vi.mocked(fetch).mock.calls[0][0] as string);
     expect(url.pathname).toBe('/api/application-forms');
     expect(Object.fromEntries(url.searchParams)).toEqual({ search: 'PROC 123', limit: '25', offset: '25' });
+  });
+});
+
+describe('compatibilidade da listagem de solicitações', () => {
+  const form = (id: string, fields: Partial<ApplicationForm> = {}) => ({
+    id, process_code: `PROC-${id}`, company_responsible: 'Empresa', company_cnpj: null,
+    municipal_registration: '', property_registration: '', street: '', district: '',
+    ...fields,
+  }) as ApplicationForm;
+
+  function respondWith(payload: unknown) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200, ok: true, json: async () => payload,
+    }));
+  }
+
+  it('preserva a resposta paginada do backend novo', async () => {
+    const page = { items: [form('2')], total: 20, limit: 1, offset: 1 };
+    respondWith(page);
+    expect(await api.listApplicationForms({ search: 'empresa', limit: 1, offset: 1 })).toEqual(page);
+  });
+
+  it('normaliza o array antigo e aplica offset e limit', async () => {
+    respondWith([form('1'), form('2'), form('3')]);
+    expect(await api.listApplicationForms({ limit: 1, offset: 1 })).toEqual({
+      items: [form('2')], total: 3, limit: 1, offset: 1,
+    });
+  });
+
+  it('aplica a busca antiga antes de calcular total e página', async () => {
+    respondWith([
+      form('1', { company_responsible: 'Outra' }),
+      form('2', { street: 'Rua das Flores' }),
+      form('3', { property_registration: 'FLORES-3' }),
+      form('4', { district: 'Flores' }),
+    ]);
+    expect(await api.listApplicationForms({ search: '  FLORES  ', limit: 1, offset: 1 })).toEqual({
+      items: [form('3', { property_registration: 'FLORES-3' })],
+      total: 3, limit: 1, offset: 1,
+    });
+  });
+
+  it('aceita array antigo vazio, inclusive com busca', async () => {
+    respondWith([]);
+    expect(await api.listApplicationForms({ search: 'empresa', limit: 25, offset: 0 })).toEqual({
+      items: [], total: 0, limit: 25, offset: 0,
+    });
   });
 });
 
