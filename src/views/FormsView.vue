@@ -13,12 +13,18 @@
 
     <v-card border class="pa-4">
       <v-text-field
-        v-model="search"
+        :model-value="formList.searchDraft.value"
         label="Buscar empresa, inscrição, endereço ou processo"
         prepend-inner-icon="mdi-magnify"
         hide-details
+        @update:model-value="formList.scheduleSearch($event)"
       />
     </v-card>
+
+    <v-alert v-if="formList.error.value && formList.items.value.length" type="warning" variant="tonal">
+      Falha ao atualizar solicitações: {{ formList.error.value }}
+      <v-btn variant="text" @click="formList.load()">Tentar novamente</v-btn>
+    </v-alert>
 
     <v-card border>
       <div class="table-wrap">
@@ -38,15 +44,22 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="filteredForms.length === 0">
+            <tr v-if="formList.items.value.length === 0">
               <td colspan="10">
                 <div class="empty-table">
                   <v-icon icon="mdi-file-document-outline" size="42" />
-                  <span>Nenhuma solicitação recebida encontrada.</span>
+                  <v-progress-circular v-if="formList.loading.value" indeterminate color="primary" />
+                  <template v-else-if="formList.error.value">
+                    <span>Erro ao carregar solicitações: {{ formList.error.value }}</span>
+                    <v-btn variant="text" @click="formList.load()">Tentar novamente</v-btn>
+                  </template>
+                  <span v-else-if="!formList.loaded.value">Carregando solicitações...</span>
+                  <span v-else-if="formList.search.value">Nenhum resultado para a busca atual.</span>
+                  <span v-else>Nenhuma solicitação recebida.</span>
                 </div>
               </td>
             </tr>
-            <tr v-for="item in filteredForms" :key="item.id">
+            <tr v-for="item in formList.items.value" :key="item.id">
               <td class="process-code">{{ item.process_code }}</td>
               <td>{{ item.company_responsible }}</td>
               <td class="mono">{{ item.company_cnpj || '—' }}</td>
@@ -101,6 +114,28 @@
           </tbody>
         </v-table>
       </div>
+      <div class="d-flex align-center justify-space-between flex-wrap pa-4 ga-4">
+        <span v-if="formList.loading.value && formList.loaded.value">Atualizando solicitações...</span>
+        <span v-else-if="formList.total.value">Exibindo {{ (formList.page.value - 1) * formList.pageSize.value + 1 }}–{{ (formList.page.value - 1) * formList.pageSize.value + formList.items.value.length }} de {{ formList.total.value }}</span>
+        <span v-else>0 resultados</span>
+        <v-select
+          :model-value="formList.pageSize.value"
+          :items="[25, 50, 100]"
+          label="Por página"
+          density="compact"
+          hide-details
+          style="max-width: 135px"
+          @update:model-value="formList.changePageSize($event)"
+        />
+      </div>
+      <v-pagination
+        v-if="formList.pageCount.value > 1"
+        :model-value="formList.page.value"
+        :length="formList.pageCount.value"
+        :total-visible="5"
+        aria-label="Páginas das solicitações recebidas"
+        @update:model-value="formList.changePage($event)"
+      />
     </v-card>
 
     <v-dialog v-model="dialog" max-width="980" scrollable>
@@ -298,6 +333,7 @@ import {
   statusLabel,
 } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
+import { useApplicationFormList } from '../stores/application-form-list';
 import { useMediaStore } from '../stores/media';
 import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput } from '../types';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
@@ -307,8 +343,7 @@ import { formatDate, formatDateTime } from '../utils/format';
 const router = useRouter();
 const auth = useAuthStore();
 const media = useMediaStore();
-const forms = ref<ApplicationForm[]>([]);
-const search = ref('');
+const formList = useApplicationFormList();
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<ApplicationForm | null>(null);
@@ -335,25 +370,14 @@ const coordinateRule = (min: number, max: number, label: string) => (value: numb
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
 const calculatedRadius = computed(() => getRequiredRadius(form.media_type, form.area_m2, media.rules, form.area_rule_classification));
-const filteredForms = computed(() => {
-  const term = search.value.trim().toLocaleLowerCase('pt-BR');
-  if (!term) return forms.value;
-  return forms.value.filter((item) => [
-    item.process_code,
-    item.company_responsible,
-    item.company_cnpj ?? '',
-    item.municipal_registration,
-    item.property_registration,
-    item.street,
-    item.district,
-  ].some((value) => value.toLocaleLowerCase('pt-BR').includes(term)));
-});
-
 onMounted(() => {
-  window.addEventListener('geomidia:forms-refresh', loadForms);
-  void loadForms();
+  window.addEventListener('geomidia:forms-refresh', formList.load);
+  void formList.load();
 });
-onUnmounted(() => window.removeEventListener('geomidia:forms-refresh', loadForms));
+onUnmounted(() => {
+  window.removeEventListener('geomidia:forms-refresh', formList.load);
+  formList.dispose();
+});
 
 function blankForm(): ApplicationFormInput {
   return {
@@ -376,14 +400,6 @@ function blankForm(): ApplicationFormInput {
     requester_email: '',
     attachment_links: '',
   };
-}
-
-async function loadForms() {
-  try {
-    forms.value = await api.listApplicationForms();
-  } catch (caught) {
-    showMessage(caught instanceof Error ? caught.message : 'Falha ao carregar as solicitações recebidas.', 'error');
-  }
 }
 
 function openEdit(item: ApplicationForm) {
@@ -487,7 +503,7 @@ async function save() {
     )) as Partial<ApplicationFormInput>;
     await api.updateApplicationForm(editingId.value, changes);
     showMessage('Solicitação e ponto atualizados com sucesso.', 'success');
-    await loadForms();
+    await formList.load();
     dialog.value = false;
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao salvar a solicitação.', 'error');
@@ -502,7 +518,7 @@ async function confirmDelete() {
   try {
     await api.deleteApplicationForm(deleteTarget.value.id);
     deleteTarget.value = null;
-    await loadForms();
+    await formList.load();
     showMessage('Solicitação e ponto removidos do sistema.', 'success');
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao excluir a solicitação.', 'error');
@@ -515,7 +531,7 @@ async function startAnalysis(item: ApplicationForm) {
   saving.value = true;
   try {
     await media.startAnalysis(item.asset_id);
-    await loadForms();
+    await formList.load();
     showMessage(`Análise do processo ${item.process_code} iniciada.`, 'success');
   } catch (caught) {
     showMessage(caught instanceof Error ? caught.message : 'Falha ao iniciar a análise.', 'error');

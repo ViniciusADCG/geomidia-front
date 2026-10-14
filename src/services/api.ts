@@ -226,8 +226,8 @@ export const api = {
   deleteMediaRule(id: string) {
     return request<void>(`/media-rules/${id}`, { method: 'DELETE' });
   },
-  listApplicationForms(search = '') {
-    return request<ApplicationForm[]>(`/application-forms${queryString({ search })}`);
+  listApplicationForms(params: { search?: string; limit?: number; offset?: number } = {}) {
+    return request<Page<ApplicationForm>>(`/application-forms${queryString(params)}`);
   },
   getApplicationFormByAsset(assetId: string) {
     return request<ApplicationForm>(`/application-forms/by-asset/${assetId}`);

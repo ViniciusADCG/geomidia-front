@@ -66,6 +66,18 @@ describe('listagem paginada de veículos', () => {
   });
 });
 
+describe('listagem paginada de solicitações recebidas', () => {
+  it('envia busca, limite e offset para o backend', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200, ok: true, json: async () => ({ items: [], total: 0, limit: 25, offset: 25 }),
+    }));
+    await api.listApplicationForms({ search: 'PROC 123', limit: 25, offset: 25 });
+    const url = new URL(vi.mocked(fetch).mock.calls[0][0] as string);
+    expect(url.pathname).toBe('/api/application-forms');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ search: 'PROC 123', limit: '25', offset: '25' });
+  });
+});
+
 describe('API espacial do Mapa', () => {
   it('envia bounds, zoom e filtros para endpoints espaciais sem limit global', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
