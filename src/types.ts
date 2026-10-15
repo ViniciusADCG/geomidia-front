@@ -143,6 +143,7 @@ export interface MapClusterPage {
 }
 
 export type MediaAssetInput = Omit<MediaAsset, 'id' | 'process_code' | 'radius_meters' | 'created_at' | 'updated_at'>;
+export type MediaAssetUpdateInput = Partial<MediaAssetInput> & { confirm_conflict_approval?: boolean };
 
 export interface ApplicationFormAttachment {
   id: string;
@@ -211,7 +212,7 @@ export interface LinkedApplicationFormUpdate {
     | 'media_type' | 'number_of_faces' | 'expiration_date' | 'requester_email'>>;
   asset: Partial<Pick<MediaAssetInput,
     'official_process_code' | 'width_m' | 'top_height_m' | 'status' | 'justification'
-    | 'contact_name' | 'attachment_links'>>;
+    | 'contact_name' | 'attachment_links'>> & { confirm_conflict_approval?: boolean };
 }
 
 export interface LinkedApplicationFormResult {
@@ -238,6 +239,10 @@ export interface ConflictAnalysis {
   distance_meters?: number | null;
   minimum_distance_meters?: number | null;
   conflicts: ConflictItem[];
+}
+
+export interface ApprovalConflictPrompt extends ConflictAnalysis {
+  resolve: (confirmed: boolean) => void;
 }
 
 export interface ConflictItem {

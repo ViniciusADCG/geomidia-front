@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 
 import { ApiError, api } from '../services/api';
-import type { ActivityLog, ApplicationForm, ConflictAnalysis, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaRule, MediaStats, MediaStatus, MediaType, Page } from '../types';
+import type { ActivityLog, ApplicationForm, ConflictAnalysis, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, MediaAssetUpdateInput, MediaRule, MediaStats, MediaStatus, MediaType, Page } from '../types';
+import { requestApprovalConflictConfirmation } from '../utils/approval-conflict-confirmation';
 
 const EMPTY_STATS: MediaStats = {
   total: 0,
@@ -49,6 +50,33 @@ function messageFrom(error: unknown, fallback: string): string {
 
 function failureMessage(label: string, result: PromiseSettledResult<unknown>): string | null {
   return result.status === 'rejected' ? `${label}: ${messageFrom(result.reason, 'Falha na requisição')}` : null;
+}
+
+class ApprovalConfirmationCancelled extends Error {}
+
+function conflictConfirmationFrom(error: unknown): ConflictAnalysis | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const detail = (error.details as { detail?: unknown } | null)?.detail;
+  if (!detail || typeof detail !== 'object' || !('confirmation_required' in detail)
+    || !(detail as { confirmation_required?: boolean }).confirmation_required) return null;
+  const candidate = detail as Partial<ConflictAnalysis>;
+  if (!Array.isArray(candidate.conflicts) || typeof candidate.message !== 'string') return null;
+  return {
+    has_conflict: true,
+    message: candidate.message,
+    conflicts: candidate.conflicts,
+  };
+}
+
+async function sendWithApprovalConfirmation<T>(send: (confirmed: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await send(false);
+  } catch (error) {
+    const analysis = conflictConfirmationFrom(error);
+    if (!analysis) throw error;
+    if (!await requestApprovalConflictConfirmation(analysis)) throw new ApprovalConfirmationCancelled();
+    return send(true);
+  }
 }
 
 const loadAllInFlight = new WeakMap<object, Promise<void>>();
@@ -339,12 +367,15 @@ export const useMediaStore = defineStore('media', {
         if (generation(this) === session) this.saving = false;
       }
     },
-    async updateAsset(id: string, input: Partial<MediaAssetInput>) {
+    async updateAsset(id: string, input: MediaAssetUpdateInput) {
       const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
-        const updated = await api.updateMediaAsset(id, input);
+        const updated = await sendWithApprovalConfirmation((confirmed) => api.updateMediaAsset(id, {
+          ...input,
+          confirm_conflict_approval: confirmed,
+        }));
         if (generation(this) !== session) return updated;
         const index = this.assets.findIndex((asset) => asset.id === id);
         if (index >= 0) this.assets[index] = updated;
@@ -353,6 +384,7 @@ export const useMediaStore = defineStore('media', {
         return updated;
       } catch (error) {
         if (generation(this) !== session) throw error;
+        if (error instanceof ApprovalConfirmationCancelled) throw error;
         this.error = messageFrom(error, 'Falha ao atualizar o ativo.');
         throw error;
       } finally {
@@ -364,7 +396,10 @@ export const useMediaStore = defineStore('media', {
       this.saving = true;
       this.error = null;
       try {
-        const { form, asset } = await api.updateLinkedApplicationForm(formId, { form: formInput, asset: assetInput });
+        const { form, asset } = await sendWithApprovalConfirmation((confirmed) => api.updateLinkedApplicationForm(formId, {
+          form: formInput,
+          asset: { ...assetInput, confirm_conflict_approval: confirmed },
+        }));
         if (generation(this) !== session) return asset;
         if (form.asset_id !== id || asset.id !== id) throw new Error('Resposta inconsistente da edição vinculada.');
         const formIndex = this.applicationForms.findIndex((item) => item.id === formId);
@@ -384,6 +419,7 @@ export const useMediaStore = defineStore('media', {
         return asset;
       } catch (error) {
         if (generation(this) !== session) throw error;
+        if (error instanceof ApprovalConfirmationCancelled) throw error;
         this.error = messageFrom(error, 'Falha ao atualizar o cadastro.');
         throw error;
       } finally {
