@@ -143,7 +143,10 @@ export interface MapClusterPage {
 }
 
 export type MediaAssetInput = Omit<MediaAsset, 'id' | 'process_code' | 'radius_meters' | 'created_at' | 'updated_at'>;
-export type MediaAssetUpdateInput = Partial<MediaAssetInput> & { confirm_conflict_approval?: boolean };
+export type MediaAssetUpdateInput = Partial<MediaAssetInput> & {
+  confirm_conflict_approval?: boolean;
+  confirmed_conflicts?: ConflictItem[];
+};
 
 export interface ApplicationFormAttachment {
   id: string;
@@ -212,7 +215,10 @@ export interface LinkedApplicationFormUpdate {
     | 'media_type' | 'number_of_faces' | 'expiration_date' | 'requester_email'>>;
   asset: Partial<Pick<MediaAssetInput,
     'official_process_code' | 'width_m' | 'top_height_m' | 'status' | 'justification'
-    | 'contact_name' | 'attachment_links'>> & { confirm_conflict_approval?: boolean };
+    | 'contact_name' | 'attachment_links'>> & {
+      confirm_conflict_approval?: boolean;
+      confirmed_conflicts?: ConflictItem[];
+    };
 }
 
 export interface LinkedApplicationFormResult {

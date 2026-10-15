@@ -68,15 +68,19 @@ function conflictConfirmationFrom(error: unknown): ConflictAnalysis | null {
   };
 }
 
-async function sendWithApprovalConfirmation<T>(send: (confirmed: boolean) => Promise<T>): Promise<T> {
-  try {
-    return await send(false);
-  } catch (error) {
-    const analysis = conflictConfirmationFrom(error);
-    if (!analysis) throw error;
-    if (!await requestApprovalConflictConfirmation(analysis)) throw new ApprovalConfirmationCancelled();
-    return send(true);
+async function sendWithApprovalConfirmation<T>(send: (confirmedConflicts?: ConflictAnalysis['conflicts']) => Promise<T>): Promise<T> {
+  let confirmedConflicts: ConflictAnalysis['conflicts'] | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await send(confirmedConflicts);
+    } catch (error) {
+      const analysis = conflictConfirmationFrom(error);
+      if (!analysis) throw error;
+      if (!await requestApprovalConflictConfirmation(analysis)) throw new ApprovalConfirmationCancelled();
+      confirmedConflicts = analysis.conflicts;
+    }
   }
+  throw new Error('Os conflitos mudaram durante as confirmações. Revise a análise e tente novamente.');
 }
 
 const loadAllInFlight = new WeakMap<object, Promise<void>>();
@@ -372,10 +376,9 @@ export const useMediaStore = defineStore('media', {
       this.saving = true;
       this.error = null;
       try {
-        const updated = await sendWithApprovalConfirmation((confirmed) => api.updateMediaAsset(id, {
-          ...input,
-          confirm_conflict_approval: confirmed,
-        }));
+        const updated = await sendWithApprovalConfirmation((confirmedConflicts) => api.updateMediaAsset(id, confirmedConflicts
+          ? { ...input, confirm_conflict_approval: true, confirmed_conflicts: confirmedConflicts }
+          : input));
         if (generation(this) !== session) return updated;
         const index = this.assets.findIndex((asset) => asset.id === id);
         if (index >= 0) this.assets[index] = updated;
@@ -396,9 +399,11 @@ export const useMediaStore = defineStore('media', {
       this.saving = true;
       this.error = null;
       try {
-        const { form, asset } = await sendWithApprovalConfirmation((confirmed) => api.updateLinkedApplicationForm(formId, {
+        const { form, asset } = await sendWithApprovalConfirmation((confirmedConflicts) => api.updateLinkedApplicationForm(formId, {
           form: formInput,
-          asset: { ...assetInput, confirm_conflict_approval: confirmed },
+          asset: confirmedConflicts
+            ? { ...assetInput, confirm_conflict_approval: true, confirmed_conflicts: confirmedConflicts }
+            : assetInput,
         }));
         if (generation(this) !== session) return asset;
         if (form.asset_id !== id || asset.id !== id) throw new Error('Resposta inconsistente da edição vinculada.');
