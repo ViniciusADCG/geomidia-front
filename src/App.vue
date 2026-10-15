@@ -89,6 +89,30 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <v-dialog v-model="approvalConflictDialog" max-width="560" persistent>
+        <v-card title="Conflito territorial identificado">
+          <v-card-text>
+            <p>{{ approvalConflict?.message }}</p>
+            <p class="mt-3">A aprovação pode ser registrada se essa for sua decisão. Deseja aprovar o processo mesmo assim?</p>
+            <v-list v-if="approvalConflict?.conflicts.length" density="compact" class="mt-3">
+              <v-list-item
+                v-for="conflict in approvalConflict.conflicts"
+                :key="conflict.conflicting_asset_id"
+                :title="conflict.process_code"
+                :subtitle="`${Math.round(conflict.distance_meters)} m de distância; mínimo ${conflict.minimum_distance_meters} m`"
+                prepend-icon="mdi-alert-circle-outline"
+              />
+            </v-list>
+            <p class="mt-3 text-medium-emphasis">Sua confirmação e os conflitos encontrados serão registrados no histórico do processo.</p>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="resolveApprovalConflict(false)">Cancelar</v-btn>
+            <v-btn color="warning" @click="resolveApprovalConflict(true)">Aprovar mesmo assim</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
   </v-app>
 </template>
@@ -99,6 +123,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 
 import AdminTopbar from './components/AdminTopbar.vue';
+import type { ApprovalConflictPrompt } from './types';
+import { APPROVAL_CONFLICT_EVENT } from './utils/approval-conflict-confirmation';
 import { exitVisualPreview, isVisualPreview } from './router';
 import { useAuthStore } from './stores/auth';
 import { useMapStore } from './stores/map';
@@ -112,6 +138,9 @@ const router = useRouter();
 const display = useDisplay();
 const drawer = ref(true);
 const confirmLogout = ref(false);
+const approvalConflictDialog = ref(false);
+const approvalConflict = ref<ApprovalConflictPrompt | null>(null);
+let resolveApprovalConflictPrompt: ((confirmed: boolean) => void) | null = null;
 let sessionValidated = false;
 
 if (isVisualPreview()) {
@@ -142,6 +171,7 @@ const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista G
 
 onMounted(() => {
   window.addEventListener('geomidia:unauthorized', handleUnauthorized);
+  window.addEventListener(APPROVAL_CONFLICT_EVENT, handleApprovalConflict as EventListener);
 });
 
 watch(
@@ -167,7 +197,26 @@ watch(() => auth.isAuthenticated, (authenticated) => {
   }
 });
 
-onUnmounted(() => window.removeEventListener('geomidia:unauthorized', handleUnauthorized));
+onUnmounted(() => {
+  window.removeEventListener('geomidia:unauthorized', handleUnauthorized);
+  window.removeEventListener(APPROVAL_CONFLICT_EVENT, handleApprovalConflict as EventListener);
+  resolveApprovalConflict(false);
+});
+
+function handleApprovalConflict(event: Event) {
+  const prompt = (event as CustomEvent<ApprovalConflictPrompt>).detail;
+  approvalConflict.value = prompt;
+  resolveApprovalConflictPrompt = prompt.resolve;
+  approvalConflictDialog.value = true;
+}
+
+function resolveApprovalConflict(confirmed: boolean) {
+  const resolve = resolveApprovalConflictPrompt;
+  resolveApprovalConflictPrompt = null;
+  approvalConflictDialog.value = false;
+  approvalConflict.value = null;
+  resolve?.(confirmed);
+}
 
 function navigate(view: 'dashboard' | 'map' | 'inventory' | 'expirations' | 'forms' | 'requirements' | 'users' | 'rules') {
   void router.push({ name: view });

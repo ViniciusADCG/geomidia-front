@@ -13,6 +13,7 @@ import type {
   LinkedApplicationFormUpdate,
   MediaAsset,
   MediaAssetInput,
+  MediaAssetUpdateInput,
   MediaRule,
   MediaRuleInput,
   MediaStats,
@@ -182,7 +183,7 @@ export const api = {
   getMediaAsset(id: string) {
     return request<MediaAsset>(`/media-assets/${id}`);
   },
-  updateMediaAsset(id: string, input: Partial<MediaAssetInput>) {
+  updateMediaAsset(id: string, input: MediaAssetUpdateInput) {
     return request<MediaAsset>(`/media-assets/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
   previewRadiusReassessment(id: string) {
