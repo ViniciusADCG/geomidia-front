@@ -2,7 +2,7 @@
   <v-app-bar flat height="58" class="admin-topbar">
     <v-app-bar-nav-icon v-if="showMenu" @click="$emit('toggle-menu')" />
     <div class="topbar-context">
-      <img class="prefcglogooficial" src="/prefcglogoficial1.png" alt="PREFCG" width="600" height="60" />
+      <img class="prefcglogooficial" src="/prefcglogoficial2.png" alt="Prefeitura de Campo Grande — SEMADES" width="465" height="50" />
     </div>
     <v-spacer />
     <v-btn
