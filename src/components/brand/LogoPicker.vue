@@ -2,10 +2,10 @@
   <div
     class="fixed right-4 bottom-4 z-[2000] w-72 rounded-lg border bg-card p-3 text-foreground shadow-lg"
     role="group"
-    aria-label="Testar tela de login"
+    aria-label="Testar fundo do login"
   >
     <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-semibold">Testar tela de login</p>
+      <p class="text-sm font-semibold">Testar fundo do login</p>
       <button
         type="button"
         class="rounded-sm text-sm text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
@@ -39,10 +39,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useLoginVariant } from '@/composables/useLoginVariant';
+import { useLoginBackground } from '@/composables/useLoginBackground';
 import { cn } from '@/lib/utils';
 
-const { selectedId, variants } = useLoginVariant();
+const { selectedId, variants } = useLoginBackground();
 const collapsed = ref(false);
 const current = computed(() => variants.find((item) => item.id === selectedId.value));
 </script>
