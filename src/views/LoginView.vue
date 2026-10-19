@@ -15,7 +15,7 @@
         <div class="login-content">
           <div class="login-intro">
             <h2>Acesso ao sistema</h2>
-            <p>Informe suas credenciais para continuar<br class="login-intro-break" /> no GeoMídia.</p>
+            <p>Informe suas credenciais para acessar<br class="login-intro-break" /> o GeoMídia.</p>
           </div>
 
           <v-alert
@@ -85,7 +85,7 @@
           </v-form>
 
           <div class="login-security">
-            <div class="login-divider"><span>ou</span></div>
+            <div class="login-divider" aria-hidden="true"></div>
             <div class="login-security-message">
               <v-icon icon="mdi-help-circle-outline" size="21" />
               <span>Ambiente seguro de gestão municipal</span>

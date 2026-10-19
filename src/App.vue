@@ -11,9 +11,7 @@
         class="admin-sidebar"
       >
         <div class="brand-block">
-          <div class="brand-icon">
-            <v-icon icon="mdi-compass-outline" size="24" />
-          </div>
+          <img class="brand-mark" src="/Logocircular-arredondado.png" alt="" width="38" height="38" />
           <div>
             <h1>GeoMídia</h1>
             <span>Campo Grande, MS</span>
