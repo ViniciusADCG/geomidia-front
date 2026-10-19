@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import '@fontsource-variable/onest';
 import 'vuetify/styles';
 import './styles/tailwind.css';
+import './styles/map.css';
 
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';

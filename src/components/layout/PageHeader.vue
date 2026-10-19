@@ -7,7 +7,7 @@
         <slot name="description">{{ description }}</slot>
       </p>
     </div>
-    <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2">
+    <div v-if="$slots.actions" class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <slot name="actions" />
     </div>
   </header>

@@ -1,348 +1,272 @@
 <template>
-  <section class="view-stack">
-    <div class="view-header">
-      <div>
-        <h2>Mapa GIS</h2>
-        <p>Campo Grande, MS</p>
+  <section class="flex flex-col lg:h-[calc(100dvh-8rem)]">
+    <PageHeader title="Mapa GIS">
+      <template #description>
+        <span v-if="mapState.loading">Atualizando mapa...</span>
+        <span v-else-if="mapState.error">Não foi possível carregar o mapa.</span>
+        <span v-else>
+          <span class="tabular font-medium text-foreground">{{ mapState.total }}</span>
+          {{ mapState.total === 1 ? 'ativo na área visível' : 'ativos na área visível' }}{{ mapState.tooMany ? ', agrupados por região' : '' }}.
+        </span>
+      </template>
+      <template #actions>
+        <div class="grid w-full gap-2 md:w-auto md:grid-cols-3">
+          <Select v-model="companyFilter">
+            <SelectTrigger class="w-full md:w-48" aria-label="Filtrar por empresa"><SelectValue /></SelectTrigger>
+            <SelectContent class="max-h-72">
+              <SelectItem v-for="option in companyFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="typeFilter">
+            <SelectTrigger class="w-full md:w-48" aria-label="Filtrar por tipo"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="option in typeFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="statusFilter">
+            <SelectTrigger class="w-full md:w-44" aria-label="Filtrar por status"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="option in statusFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </template>
+    </PageHeader>
+
+    <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_25rem]">
+      <div class="relative isolate overflow-hidden rounded-lg border bg-card">
+        <div ref="mapElement" class="h-[60dvh] w-full lg:h-full" />
+        <div
+          v-if="mapState.error"
+          class="absolute inset-x-3 top-3 z-[1000] flex flex-wrap items-center gap-3 rounded-md bg-card px-4 py-3 text-sm shadow-md"
+          role="alert"
+        >
+          <CircleAlert class="size-4 text-destructive" aria-hidden="true" />
+          <span class="flex-1">{{ mapState.error }}</span>
+          <Button variant="outline" size="sm" @click="refreshMap">Tentar novamente</Button>
+        </div>
       </div>
-    </div>
-    <div class="map-layout">
-    <v-card border class="map-panel">
-      <div class="map-topbar">
-        <div>
-          <strong>Mapa GIS · Campo Grande, MS</strong>
-          <span v-if="mapState.loading">Atualizando mapa...</span>
-          <span v-else-if="mapState.error">Não foi possível carregar o mapa</span>
-          <span v-else>{{ mapState.total }} ativo(s) na área visível{{ mapState.tooMany ? ' · agrupados' : '' }}</span>
-        </div>
-        <div class="map-filters">
-          <v-select
-            v-model="companyFilter"
-            :items="companyFilterOptions"
-            label="Filtrar empresa"
-            hide-details
-            class="map-filter map-filter--company"
-          />
-          <v-select
-            v-model="typeFilter"
-            :items="typeFilterOptions"
-            label="Filtrar tipo"
-            hide-details
-            class="map-filter"
-          />
-          <v-select
-            v-model="statusFilter"
-            :items="statusFilterOptions"
-            label="Filtrar status"
-            hide-details
-            class="map-filter"
-          />
-        </div>
-      </div>
-      <div ref="mapElement" class="leaflet-map" />
-      <v-alert v-if="mapState.error" type="error" variant="tonal" density="compact" class="ma-2">
-        {{ mapState.error }}
-        <v-btn variant="text" size="small" @click="refreshMap">Tentar novamente</v-btn>
-      </v-alert>
-    </v-card>
 
-    <aside ref="sideStack" class="side-stack">
-      <v-btn-toggle v-model="mode" mandatory divided density="comfortable" class="w-100">
-        <v-btn value="analysis" class="flex-1">Análise</v-btn>
-        <v-btn v-if="auth.canWrite" value="form" class="flex-1" :disabled="Boolean(selectedAsset)">Cadastro</v-btn>
-      </v-btn-toggle>
-
-      <v-card v-if="mode === 'form'" border class="pa-5">
-        <div class="card-title-row">
-          <h3>Novo Ponto</h3>
-          <v-chip size="small" color="primary" variant="tonal">
-            {{ draft.latitude.toFixed(5) }}, {{ draft.longitude.toFixed(5) }}
-          </v-chip>
-        </div>
-
-        <v-form v-model="draftValid" class="stack-form" @submit.prevent="saveDraft">
-          <v-select v-model="draft.media_type" :items="registrationMediaTypeOptions" label="Tipo" />
-          <v-text-field v-model="draft.address" label="Endereço" :rules="[required]" />
-          <v-select v-model="draft.district" :items="DISTRICT_OPTIONS" label="Bairro" />
-          <v-select
-            v-if="draftAreaThreshold != null"
-            v-model="draft.area_rule_classification"
-            :label="`O painel possui área superior ao limite de ${draftAreaThreshold} m²?`"
-            :items="[{ title: 'Não', value: 'within_limit' }, { title: 'Sim', value: 'above_limit' }]"
-            :rules="[required]"
-          />
-          <v-text-field
-            v-model="draft.expiration_date"
-            label="Vencimento da autorização"
-            type="date"
-            hint="Opcional"
-            persistent-hint
-          />
-          <v-alert v-if="draftAreaThreshold == null || draft.area_rule_classification" color="primary" variant="tonal" density="compact">
-            Raio calculado: {{ getRequiredRadius(draft.media_type, draft.area_m2, media.rules, draft.area_rule_classification) }}m
-          </v-alert>
-          <v-btn color="primary" type="submit" block :loading="media.saving" :disabled="!draftValid">
-            Adicionar e Mapear
-          </v-btn>
-        </v-form>
-      </v-card>
-
-      <v-card v-else border class="analysis-card" :class="{ 'analysis-card--selected': selectedAsset }">
-        <template v-if="selectedAsset">
-          <div class="analysis-card-header selected-header">
-            <div>
-              <v-chip size="small" color="primary" variant="tonal" class="process-code">{{ selectedAsset.official_process_code || selectedAsset.process_code }}</v-chip>
-              <h3>{{ selectedAsset.address }}</h3>
-              <span>{{ selectedAsset.district }} · {{ mediaTypeLabel(selectedAsset.media_type) }}</span>
-            </div>
-            <div class="selected-header-actions">
-              <v-chip :color="statusColor(selectedAsset.status)" variant="tonal" class="status-chip">
-                {{ statusLabel(selectedAsset.status) }}
-              </v-chip>
-              <v-btn icon="mdi-close" size="small" variant="text" title="Fechar detalhes" aria-label="Fechar detalhes" @click="mapState.selectAsset(null, auth.canWrite)" />
-            </div>
-          </div>
-
-          <div ref="detailScrollElement" class="analysis-card-body">
-          <h4 class="detail-section-title">Dados do processo</h4>
-          <div class="spec-grid">
-            <div><span>{{ selectedAsset.official_process_code ? 'Processo oficial' : 'Protocolo' }}</span><strong class="process-code">{{ selectedAsset.official_process_code || selectedAsset.process_code }}</strong></div>
-            <div v-if="selectedAsset.official_process_code"><span>Protocolo de origem</span><strong class="process-code">{{ selectedAsset.process_code }}</strong></div>
-            <div><span>Status</span><strong>{{ statusLabel(selectedAsset.status) }}</strong></div>
-            <div><span>Criado em</span><strong>{{ formatDateTime(selectedAsset.created_at) }}</strong></div>
-            <div><span>Atualizado em</span><strong>{{ formatDateTime(selectedAsset.updated_at) }}</strong></div>
-            <div v-if="selectedAsset.justification" class="detail-wide">
-              <span>Justificativa / análise</span><strong>{{ selectedAsset.justification }}</strong>
-            </div>
-          </div>
-
-          <v-alert
-            v-if="selectedAsset.status === 'novos processos'"
-            type="info"
-            variant="tonal"
-            class="my-4"
+      <aside ref="sideStack" class="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-card" aria-label="Painel do mapa">
+        <div v-if="auth.canWrite" class="grid grid-cols-2 gap-1 border-b bg-muted/50 p-1.5" role="tablist" aria-label="Modo do painel">
+          <button
+            v-for="tab in panelTabs"
+            :key="tab.value"
+            type="button"
+            role="tab"
+            :aria-selected="mode === tab.value"
+            :disabled="tab.value === 'form' && Boolean(selectedAsset)"
+            :title="tab.value === 'form' && selectedAsset ? 'Feche o ativo selecionado para cadastrar um novo ponto' : undefined"
+            :class="cn(
+              'h-9 rounded-md text-base font-medium text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+              mode === tab.value ? 'bg-card text-foreground shadow-xs' : 'hover:text-foreground',
+            )"
+            @click="mode = tab.value"
           >
-            Este processo é novo. Inicie a análise para calcular conflitos e liberar as demais situações.
-          </v-alert>
-          <v-alert
-            v-else
-            :type="analysis?.has_conflict ? 'error' : 'success'"
-            variant="tonal"
-            class="my-4"
-          >
-            {{ media.analyzing ? 'Analisando viabilidade territorial...' : (analysis?.message ?? 'Análise indisponível.') }}
-          </v-alert>
+            {{ tab.label }}
+          </button>
+        </div>
 
-          <v-list v-if="selectedAsset.status !== 'novos processos' && analysis?.conflicts.length" density="compact" class="mb-3">
-            <v-list-item
-              v-for="conflict in analysis.conflicts"
-              :key="conflict.conflicting_asset_id"
-              :title="conflict.process_code"
-              :subtitle="`${Math.round(conflict.distance_meters)}m de distância · mínimo ${conflict.minimum_distance_meters}m`"
-              prepend-icon="mdi-alert-circle-outline"
+        <form v-if="mode === 'form'" class="grid content-start gap-4 overflow-y-auto p-5" novalidate @submit.prevent="saveDraft">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-semibold">Novo ponto</h2>
+            <span class="tabular rounded-full bg-secondary px-2.5 py-0.5 text-sm text-primary">
+              {{ draft.latitude.toFixed(5) }}, {{ draft.longitude.toFixed(5) }}
+            </span>
+          </div>
+          <FormField v-slot="{ id }" label="Tipo de veículo">
+            <Select v-model="draft.media_type">
+              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="option in registrationMediaTypeOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField v-slot="{ id, invalid }" label="Endereço" required :error="draftAttempted && !draft.address.trim() ? 'Informe o endereço.' : null">
+            <Input :id="id" v-model="draft.address" :aria-invalid="invalid || undefined" />
+          </FormField>
+          <FormField v-slot="{ id }" label="Bairro">
+            <Select v-model="draft.district">
+              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent class="max-h-72">
+                <SelectItem v-for="district in DISTRICT_OPTIONS" :key="district" :value="district">{{ district }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+          <fieldset v-if="draftAreaThreshold != null" class="grid gap-2">
+            <legend class="text-sm font-medium">
+              O painel tem área maior que <span class="tabular">{{ draftAreaThreshold }}</span> m²?<span class="text-destructive" aria-hidden="true"> *</span>
+            </legend>
+            <div class="flex gap-2">
+              <label
+                v-for="option in AREA_OPTIONS"
+                :key="option.value"
+                class="flex h-10 cursor-pointer items-center gap-2 rounded-md border px-4 has-[:checked]:border-primary has-[:checked]:bg-secondary has-[:checked]:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+              >
+                <input v-model="draft.area_rule_classification" type="radio" name="draft-area-rule" :value="option.value" class="accent-[var(--brand-navy)]" />
+                {{ option.title }}
+              </label>
+            </div>
+            <p v-if="draftAttempted && !draft.area_rule_classification" class="text-sm text-destructive">Responda se a área passa do limite.</p>
+          </fieldset>
+          <FormField v-slot="{ id }" label="Vencimento da autorização" hint="Opcional">
+            <Input :id="id" :model-value="draft.expiration_date ?? ''" type="date" @update:model-value="draft.expiration_date = String($event) || null" />
+          </FormField>
+          <p v-if="draftAreaThreshold == null || draft.area_rule_classification" class="flex gap-3 rounded-md bg-secondary px-4 py-3 text-sm text-foreground">
+            <Ruler class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>Raio calculado: <strong class="tabular">{{ getRequiredRadius(draft.media_type, draft.area_m2, media.rules, draft.area_rule_classification) }} m</strong></span>
+          </p>
+          <Button type="submit" class="w-full" :disabled="media.saving">
+            <LoaderCircle v-if="media.saving" class="animate-spin" />
+            <MapPinPlus v-else />
+            Adicionar ao mapa
+          </Button>
+        </form>
+
+        <template v-else-if="selectedAsset">
+          <header class="flex items-start gap-3 border-b p-5">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="font-semibold">{{ selectedAsset.official_process_code || selectedAsset.process_code }}</p>
+                <StatusBadge :status="selectedAsset.status" />
+              </div>
+              <p class="mt-1 truncate" :title="selectedAsset.address">{{ selectedAsset.address }}</p>
+              <p class="text-sm text-muted-foreground">{{ selectedAsset.district }}, {{ mediaTypeLabel(selectedAsset.media_type) }}</p>
+            </div>
+            <Button variant="ghost" size="icon-sm" aria-label="Fechar detalhes" title="Fechar detalhes" @click="mapState.selectAsset(null, auth.canWrite)">
+              <X />
+            </Button>
+          </header>
+
+          <div ref="detailScrollElement" class="grid content-start gap-5 overflow-y-auto p-5">
+            <div v-if="mapState.formLoading && auth.canWrite" class="grid gap-2" aria-label="Carregando solicitação e anexos">
+              <Skeleton class="h-10" />
+            </div>
+            <div v-if="mapState.formError && auth.canWrite" class="flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-3 text-sm">
+              <span>{{ mapState.formError }}</span>
+              <Button variant="link" size="sm" class="h-auto px-0" @click="mapState.refreshSelected(auth.canWrite)">Tentar novamente</Button>
+            </div>
+
+            <AssetDetails
+              :asset="selectedAsset"
+              :form="selectedForm"
+              :analysis="analysis"
+              :analyzing="media.analyzing"
+              @open-attachment="openUploadedAttachment"
             />
-          </v-list>
 
-          <v-alert v-if="mapState.formLoading && auth.canWrite" type="info" variant="tonal" density="compact" class="mt-4">
-            Carregando dados da solicitação e anexos...
-          </v-alert>
-          <v-alert v-if="mapState.formError && auth.canWrite" type="warning" variant="tonal" density="compact" class="mt-4">
-            {{ mapState.formError }}
-            <v-btn variant="text" size="small" @click="mapState.refreshSelected(auth.canWrite)">Tentar novamente</v-btn>
-          </v-alert>
+            <section v-if="auth.canWrite" class="grid gap-4 border-t pt-5">
+              <Button
+                v-if="selectedAsset.status === 'novos processos'"
+                class="w-full"
+                :disabled="media.saving"
+                @click="startSelectedAnalysis"
+              >
+                <LoaderCircle v-if="media.saving" class="animate-spin" />
+                <Play v-else />
+                Iniciar análise
+              </Button>
+              <template v-else>
+                <h3 class="text-sm font-semibold">Decisão</h3>
+                <FormField v-slot="{ id }" label="Situação">
+                  <Select v-model="reviewStatus">
+                    <SelectTrigger :id="id" class="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="option in DECISION_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField v-slot="{ id }" label="Justificativa">
+                  <Textarea :id="id" v-model="reviewJustification" rows="3" />
+                </FormField>
+                <AttachmentLinksEditor v-model="reviewAttachmentLinks" />
+                <Button class="w-full" :disabled="media.saving || media.analyzing" @click="saveDecision">
+                  <LoaderCircle v-if="media.saving" class="animate-spin" />
+                  Salvar decisão
+                </Button>
+              </template>
+            </section>
 
-          <h4 v-if="selectedForm || selectedAsset.company_responsible || selectedAsset.contact_name || selectedAsset.contact_email" class="detail-section-title">Requerente / empresa</h4>
-          <div v-if="selectedForm || selectedAsset.company_responsible || selectedAsset.contact_name || selectedAsset.contact_email" class="spec-grid">
-            <div v-if="selectedForm?.company_responsible || selectedAsset.company_responsible || selectedAsset.contact_name">
-              <span>Empresa / responsável</span>
-              <strong>{{ selectedForm?.company_responsible || selectedAsset.company_responsible || selectedAsset.contact_name }}</strong>
-            </div>
-            <div v-if="selectedAsset.contact_name && selectedAsset.contact_name !== (selectedForm?.company_responsible || selectedAsset.company_responsible)">
-              <span>Contato</span><strong>{{ selectedAsset.contact_name }}</strong>
-            </div>
-            <div v-if="selectedForm?.company_cnpj || selectedAsset.company_cnpj">
-              <span>CNPJ</span><strong>{{ formatCompanyCnpj(selectedForm?.company_cnpj || selectedAsset.company_cnpj) }}</strong>
-            </div>
-            <div v-if="selectedForm?.municipal_registration">
-              <span>Inscrição municipal</span><strong>{{ selectedForm.municipal_registration }}</strong>
-            </div>
-            <div v-if="selectedForm?.requester_email || selectedAsset.contact_email">
-              <span>E-mail</span><strong>{{ selectedForm?.requester_email || selectedAsset.contact_email }}</strong>
-            </div>
-          </div>
-
-          <h4 class="detail-section-title">Local de instalação</h4>
-          <div class="spec-grid">
-            <div v-if="selectedForm?.property_registration">
-              <span>Inscrição imobiliária</span><strong>{{ selectedForm.property_registration }}</strong>
-            </div>
-            <div class="detail-wide">
-              <span>Endereço</span><strong>{{ selectedForm ? `${selectedForm.street}, ${selectedForm.number}` : selectedAsset.address }}</strong>
-            </div>
-            <div><span>Bairro</span><strong>{{ selectedForm?.district || selectedAsset.district }}</strong></div>
-            <div v-if="selectedForm?.postal_code"><span>CEP</span><strong>{{ selectedForm.postal_code }}</strong></div>
-            <div><span>Latitude</span><strong>{{ selectedAsset.latitude.toFixed(6) }}</strong></div>
-            <div><span>Longitude</span><strong>{{ selectedAsset.longitude.toFixed(6) }}</strong></div>
-          </div>
-
-          <h4 class="detail-section-title">Veículo de comunicação</h4>
-          <div class="spec-grid">
-            <div><span>Tipo</span><strong>{{ mediaTypeLabel(selectedAsset.media_type) }}</strong></div>
-            <div v-if="selectedForm?.number_of_faces"><span>Quantidade de faces</span><strong>{{ selectedForm.number_of_faces }}</strong></div>
-            <div v-if="selectedAsset.width_m != null">
-              <span>Largura</span>
-              <strong>{{ selectedAsset.width_m }} m</strong>
-            </div>
-            <div v-if="selectedAsset.top_height_m != null">
-              <span>Borda superior</span>
-              <strong>{{ selectedAsset.top_height_m }} m</strong>
-            </div>
-            <div>
-              <span>Raio</span>
-              <strong>{{ selectedAsset.radius_meters }} m</strong>
-            </div>
-            <div v-if="selectedAsset.expiration_date">
-              <span>Vencimento</span>
-              <strong>{{ formatDate(selectedAsset.expiration_date) }}</strong>
-            </div>
-          </div>
-
-          <template v-if="formDocuments.length || formImages.length || selectedAttachmentLinks.length">
-            <h4 class="detail-section-title">Anexos / documentos</h4>
-            <div v-if="formDocuments.length" class="detail-attachment-list">
-              <div v-for="attachment in formDocuments" :key="attachment.id" class="detail-attachment-item">
-                <div>
-                  <strong>{{ attachmentCategoryLabel(attachment.category) }}</strong>
-                  <span>{{ attachment.original_filename }}</span>
-                </div>
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-open-in-new" @click="openUploadedAttachment(attachment)">Visualizar / baixar</v-btn>
-              </div>
-            </div>
-            <h4 v-if="formImages.length" class="detail-section-title">Fotos / imagens</h4>
-            <div v-if="formImages.length" class="detail-attachment-list">
-              <div v-for="attachment in formImages" :key="attachment.id" class="detail-attachment-item">
-                <div>
-                  <strong>{{ attachmentCategoryLabel(attachment.category) }}</strong>
-                  <span>{{ attachment.original_filename }}</span>
-                </div>
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-image-outline" @click="openUploadedAttachment(attachment)">Visualizar / baixar</v-btn>
-              </div>
-            </div>
-            <div v-if="selectedAttachmentLinks.length" class="detail-attachment-list mt-3">
-              <div v-for="(link, index) in selectedAttachmentLinks" :key="`${link}-${index}`" class="detail-attachment-item">
-                <span>Link de anexo {{ index + 1 }}</span>
-                <v-btn :href="link" target="_blank" rel="noopener noreferrer" size="small" variant="tonal" prepend-icon="mdi-open-in-new">Abrir</v-btn>
-              </div>
-            </div>
-          </template>
-
-          <v-divider class="my-4" />
-
-          <v-btn
-            v-if="auth.canWrite && selectedAsset.status === 'novos processos'"
-            color="info"
-            prepend-icon="mdi-play-circle-outline"
-            block
-            :loading="media.saving"
-            @click="startSelectedAnalysis"
-          >
-            Iniciar Análise
-          </v-btn>
-          <template v-else-if="auth.canWrite">
-            <v-select v-model="reviewStatus" :items="DECISION_STATUS_OPTIONS" label="Decisão" />
-            <v-textarea
-              v-model="reviewJustification"
-              label="Justificativa"
-              rows="3"
-            />
-            <div class="attachment-crud mt-2">
-              <div class="attachment-crud-header">
-                <strong>Links de anexos</strong>
-                <span>Fotos, PDFs e arquivos relacionados</span>
-              </div>
-              <div class="attachment-crud-row">
-                <v-text-field
-                  v-model="reviewAttachmentLinkDraft"
-                  label="Adicionar link"
-                  placeholder="https://..."
-                  hide-details
-                  @keydown.enter.prevent="addReviewAttachmentLink"
-                />
-                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addReviewAttachmentLink">
-                  Adicionar
-                </v-btn>
-              </div>
-              <div v-if="reviewAttachmentLinks.length" class="attachment-link-list">
-                <div
-                  v-for="(link, index) in reviewAttachmentLinks"
-                  :key="`${link}-${index}`"
-                  class="attachment-link-item"
-                >
-                  <v-btn
-                    :href="link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="text"
-                    density="comfortable"
-                    prepend-icon="mdi-open-in-new"
-                    class="attachment-link-button"
-                  >
-                    {{ link }}
-                  </v-btn>
-                  <v-btn
-                    icon="mdi-close"
-                    size="small"
-                    variant="text"
-                    color="error"
-                    title="Remover link"
-                    @click="removeReviewAttachmentLink(index)"
-                  />
-                </div>
-              </div>
-              <div v-else class="attachment-link-empty">Nenhum link adicionado ainda.</div>
-            </div>
-            <v-btn color="primary" block :loading="media.saving" :disabled="media.analyzing" @click="saveDecision">
-              Salvar Decisão
-            </v-btn>
-          </template>
-          <v-btn
-            v-if="auth.canDelete"
-            color="error"
-            variant="text"
-            prepend-icon="mdi-trash-can-outline"
-            class="mt-2"
-            @click="confirmDelete = true"
-          >
-            Excluir Ponto
-          </v-btn>
+            <Button
+              v-if="auth.canDelete"
+              variant="ghost"
+              class="justify-self-start text-destructive hover:bg-danger-soft hover:text-destructive"
+              @click="media.error = null; confirmDelete = true"
+            >
+              <Trash2 />
+              Excluir ponto
+            </Button>
           </div>
         </template>
 
-        <div v-else class="empty-state compact analysis-card-empty">
-          <v-icon icon="mdi-map-marker-question-outline" size="44" />
-          <span>{{ mapState.selectedLoading ? 'Carregando veículo...' : 'Selecione um marcador no mapa para analisar.' }}</span>
-        </div>
-      </v-card>
-    </aside>
+        <EmptyState
+          v-else
+          :icon="mapState.selectedLoading ? LoaderCircle : MousePointerClick"
+          :title="mapState.selectedLoading ? 'Carregando veículo...' : 'Selecione um ponto no mapa'"
+          :description="mapState.selectedLoading ? undefined : auth.canWrite ? 'Clique em um marcador para analisar, ou em uma área vazia para cadastrar um novo ponto.' : 'Clique em um marcador para ver os detalhes.'"
+          class="flex-1"
+        />
+      </aside>
     </div>
 
-    <v-dialog v-model="confirmDelete" max-width="440">
-      <v-card title="Confirmar exclusão">
-        <v-card-text>Deseja excluir permanentemente o ponto selecionado?</v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="confirmDelete = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="media.saving" @click="deleteSelected">Excluir</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AlertDialog :open="confirmDelete" @update:open="confirmDelete = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir o ponto {{ selectedAsset?.official_process_code || selectedAsset?.process_code }}?</AlertDialogTitle>
+          <AlertDialogDescription>O veículo sai do mapa e do inventário. Essa ação não pode ser desfeita.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <Alert v-if="media.error" variant="destructive">
+          <CircleAlert />
+          <AlertDescription>{{ media.error }}</AlertDescription>
+        </Alert>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="confirmDelete = false">Cancelar</Button>
+          <Button variant="destructive" :disabled="media.saving" @click="deleteSelected">
+            <LoaderCircle v-if="media.saving" class="animate-spin" />
+            Excluir ponto
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </section>
 </template>
 
 <script setup lang="ts">
+import {
+  CircleAlert,
+  LoaderCircle,
+  MapPinPlus,
+  MousePointerClick,
+  Play,
+  Ruler,
+  Trash2,
+  X,
+} from '@lucide/vue';
 import L from 'leaflet';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+
+import EmptyState from '@/components/common/EmptyState.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
+import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
+import FormField from '@/components/form/FormField.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import AssetDetails from '@/components/map/AssetDetails.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 import {
   DECISION_STATUS_OPTIONS,
@@ -350,19 +274,15 @@ import {
   MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
   getRequiredRadius,
-  mediaTypeColor,
   mediaTypeOptionsFromRules,
   mediaTypeLabel,
-  statusLabel,
-  statusColor,
 } from '../domain/rules';
 import { useMediaStore } from '../stores/media';
 import { useMapStore } from '../stores/map';
 import { useAuthStore } from '../stores/auth';
 import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
-import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
-import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
-import { formatDate, formatDateTime } from '../utils/format';
+import { openApplicationFormAttachment } from '../utils/application-form-attachments';
+import { joinAttachmentLinks, parseAttachmentLinks } from '../utils/attachment-links';
 import { createMapAssetLayerRenderer } from '../utils/map-asset-layers';
 import { clusterZoom, createViewportScheduler, readMapViewport } from '../utils/map-viewport';
 
@@ -383,12 +303,18 @@ const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
 const reviewStatus = ref<MediaStatus>('aprovado');
 const reviewJustification = ref('');
-const reviewAttachmentLinkDraft = ref('');
 const reviewAttachmentLinks = ref<string[]>([]);
 const draft = reactive<MediaAssetInput>(blankDraft());
-const draftValid = ref(false);
+const draftAttempted = ref(false);
 const confirmDelete = ref(false);
-const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
+const AREA_OPTIONS = [
+  { title: 'Não', value: 'within_limit' },
+  { title: 'Sim', value: 'above_limit' },
+] as const;
+const panelTabs = [
+  { value: 'analysis', label: 'Análise' },
+  { value: 'form', label: 'Cadastro' },
+] as const;
 
 let map: L.Map | null = null;
 let assetLayer: L.LayerGroup | null = null;
@@ -421,12 +347,6 @@ const statusFilterOptions = computed(() => [
 
 const selectedAsset = computed(() => mapState.selectedAsset);
 const selectedForm = computed(() => mapState.selectedForm);
-const formImages = computed(() => selectedForm.value?.attachments.filter((item) => item.content_type.startsWith('image/')) ?? []);
-const formDocuments = computed(() => selectedForm.value?.attachments.filter((item) => !item.content_type.startsWith('image/')) ?? []);
-const selectedAttachmentLinks = computed(() => [...new Set([
-  ...parseAttachmentLinks(selectedForm.value?.attachment_links),
-  ...parseAttachmentLinks(selectedAsset.value?.attachment_links),
-])].filter((link) => /^https?:\/\//i.test(link)));
 
 const analysis = computed(() => (
   selectedAsset.value ? media.analysisByAssetId[selectedAsset.value.id] : null
@@ -624,29 +544,8 @@ function blankDraft(): MediaAssetInput {
   };
 }
 
-function formatCompanyCnpj(value: string | null | undefined): string {
-  const raw = String(value ?? '').trim();
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length !== 14) return raw || 'nao informado';
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
-}
-
 function resetReviewAttachmentLinks(value: string | null | undefined = '') {
   reviewAttachmentLinks.value = parseAttachmentLinks(value);
-  reviewAttachmentLinkDraft.value = '';
-}
-
-function addReviewAttachmentLink() {
-  const link = normalizeAttachmentLink(reviewAttachmentLinkDraft.value);
-  if (!link) return;
-  if (!reviewAttachmentLinks.value.includes(link)) {
-    reviewAttachmentLinks.value = [...reviewAttachmentLinks.value, link];
-  }
-  reviewAttachmentLinkDraft.value = '';
-}
-
-function removeReviewAttachmentLink(index: number) {
-  reviewAttachmentLinks.value = reviewAttachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
 }
 
 function renderAssets() {
@@ -666,6 +565,7 @@ function handleMapClick(event: L.LeafletMouseEvent) {
     longitude: Number(event.latlng.lng.toFixed(6)),
     address: `Ponto capturado (${event.latlng.lat.toFixed(4)}, ${event.latlng.lng.toFixed(4)})`,
   });
+  draftAttempted.value = false;
   void mapState.selectAsset(null, auth.canWrite);
   mode.value = 'form';
 }
@@ -686,7 +586,8 @@ async function openUploadedAttachment(attachment: ApplicationFormAttachment) {
 }
 
 async function saveDraft() {
-  if (!draftValid.value || !draft.address.trim()) return;
+  draftAttempted.value = true;
+  if (!draft.address.trim() || (draftAreaThreshold.value != null && !draft.area_rule_classification)) return;
   try {
     await media.createAsset({
       ...draft,
@@ -735,6 +636,7 @@ async function startSelectedAnalysis() {
 
 async function deleteSelected() {
   if (!selectedAsset.value) return;
+  media.error = null;
   try {
     await media.deleteAsset(selectedAsset.value.id);
     void mapState.selectAsset(null, auth.canWrite);

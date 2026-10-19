@@ -1,0 +1,45 @@
+/* Elementos criados pelo Leaflet (fora dos templates Vue). */
+
+.leaflet-container {
+  font-family: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
+  background: #e9edf5;
+}
+
+.leaflet-control-zoom a {
+  color: var(--foreground);
+}
+
+.map-cluster-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: var(--brand-navy);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px var(--brand-yellow), 0 2px 8px rgb(27 36 99 / 0.35);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.public-properties-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.94);
+  color: var(--foreground);
+  box-shadow: 0 1px 4px rgb(31 38 80 / 0.18);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.public-properties-legend__swatch {
+  width: 18px;
+  height: 12px;
+  border: 1px solid #f57c00;
+  border-radius: 2px;
+  background: rgb(245 124 0 / 0.2);
+}
