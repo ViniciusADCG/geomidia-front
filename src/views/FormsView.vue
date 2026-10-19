@@ -1,329 +1,351 @@
 <template>
-  <section class="view-stack">
-    <div class="view-header">
-      <div>
-        <h2>Solicitações Recebidas</h2>
-        <p>Consulte e analise as solicitações enviadas pelo formulário público.</p>
-      </div>
-    </div>
+  <section>
+    <PageHeader title="Solicitações recebidas" description="Pedidos enviados pelo formulário público, prontos para análise." />
 
-    <v-alert v-if="message" :type="messageType" variant="tonal" closable @click:close="message = ''">
-      {{ message }}
-    </v-alert>
+    <Alert v-if="message && !dialog && !deleteTarget" :variant="messageType === 'error' ? 'destructive' : 'default'" class="mb-4 pr-12">
+      <CircleCheck v-if="messageType === 'success'" class="text-success" />
+      <CircleAlert v-else />
+      <AlertDescription :class="messageType === 'success' && 'text-foreground'">{{ message }}</AlertDescription>
+      <button type="button" class="absolute top-2.5 right-2.5 rounded-sm p-1 opacity-70 hover:opacity-100" aria-label="Fechar aviso" @click="message = ''">
+        <X class="size-4" />
+      </button>
+    </Alert>
 
-    <v-card border class="pa-4">
-      <v-text-field
-        :model-value="formList.searchDraft.value"
-        label="Buscar empresa, inscrição, endereço ou processo"
-        prepend-inner-icon="mdi-magnify"
-        hide-details
-        @update:model-value="formList.scheduleSearch($event)"
-      />
-    </v-card>
-
-    <v-alert v-if="formList.error.value && formList.items.value.length" type="warning" variant="tonal">
-      Falha ao atualizar solicitações: {{ formList.error.value }}
-      <v-btn variant="text" @click="formList.load()">Tentar novamente</v-btn>
-    </v-alert>
-
-    <v-card border>
-      <div class="table-wrap">
-        <v-table hover>
-          <thead>
-            <tr>
-              <th>Processo</th>
-              <th>Empresa responsável</th>
-              <th>CNPJ</th>
-              <th>Inscrição municipal</th>
-              <th>Local</th>
-              <th>Tipo de veículo</th>
-              <th>Vencimento</th>
-              <th>Status</th>
-              <th>Atualização</th>
-              <th class="text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="formList.items.value.length === 0">
-              <td colspan="10">
-                <div class="empty-table">
-                  <v-icon icon="mdi-file-document-outline" size="42" />
-                  <v-progress-circular v-if="formList.loading.value" indeterminate color="primary" />
-                  <template v-else-if="formList.error.value">
-                    <span>Erro ao carregar solicitações: {{ formList.error.value }}</span>
-                    <v-btn variant="text" @click="formList.load()">Tentar novamente</v-btn>
-                  </template>
-                  <span v-else-if="!formList.loaded.value">Carregando solicitações...</span>
-                  <span v-else-if="formList.search.value">Nenhum resultado para a busca atual.</span>
-                  <span v-else>Nenhuma solicitação recebida.</span>
-                </div>
-              </td>
-            </tr>
-            <tr v-for="item in formList.items.value" :key="item.id">
-              <td class="process-code">{{ item.process_code }}</td>
-              <td>{{ item.company_responsible }}</td>
-              <td class="mono">{{ item.company_cnpj || '—' }}</td>
-              <td class="mono">{{ item.municipal_registration }}</td>
-              <td>{{ item.street }}, {{ item.number }} · {{ item.district }}</td>
-              <td>{{ mediaTypeLabel(item.media_type) }}</td>
-              <td class="mono">{{ formatDate(item.expiration_date) }}</td>
-              <td>
-                <v-chip :color="statusColor(item.status)" size="small" variant="tonal" class="status-chip">
-                  {{ statusLabel(item.status) }}
-                </v-chip>
-              </td>
-              <td>{{ formatDateTime(item.updated_at) }}</td>
-              <td>
-                <div class="row-actions">
-                  <v-btn
-                    icon="mdi-map-marker-outline"
-                    size="small"
-                    variant="tonal"
-                    title="Visualizar no mapa"
-                    @click="viewOnMap(item)"
-                  />
-                  <v-btn
-                    icon="mdi-pencil-outline"
-                    size="small"
-                    variant="tonal"
-                    title="Editar solicitação"
-                    @click="openEdit(item)"
-                  />
-                  <v-btn
-                    v-if="item.status === 'novos processos'"
-                    icon="mdi-play-circle-outline"
-                    size="small"
-                    color="info"
-                    variant="tonal"
-                    title="Iniciar análise"
-                    :loading="saving"
-                    @click="startAnalysis(item)"
-                  />
-                  <v-btn
-                    v-if="auth.canDelete"
-                    icon="mdi-trash-can-outline"
-                    size="small"
-                    color="error"
-                    variant="tonal"
-                    title="Excluir solicitação e ponto"
-                    @click="deleteTarget = item"
-                  />
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </div>
-      <div class="d-flex align-center justify-space-between flex-wrap pa-4 ga-4">
-        <span v-if="formList.loading.value && formList.loaded.value">Atualizando solicitações...</span>
-        <span v-else-if="formList.total.value">Exibindo {{ (formList.page.value - 1) * formList.pageSize.value + 1 }}–{{ (formList.page.value - 1) * formList.pageSize.value + formList.items.value.length }} de {{ formList.total.value }}</span>
-        <span v-else>0 resultados</span>
-        <v-select
-          :model-value="formList.pageSize.value"
-          :items="[25, 50, 100]"
-          label="Por página"
-          density="compact"
-          hide-details
-          style="max-width: 135px"
-          @update:model-value="formList.changePageSize($event)"
+    <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="border-b p-4">
+        <SearchInput
+          :model-value="formList.searchDraft.value"
+          placeholder="Empresa, inscrição, endereço ou processo"
+          label="Buscar solicitações"
+          @update:model-value="formList.scheduleSearch($event)"
         />
       </div>
-      <v-pagination
-        v-if="formList.pageCount.value > 1"
-        :model-value="formList.page.value"
-        :length="formList.pageCount.value"
-        :total-visible="5"
-        aria-label="Páginas das solicitações recebidas"
-        @update:model-value="formList.changePage($event)"
-      />
-    </v-card>
 
-    <v-dialog v-model="dialog" max-width="980" scrollable>
-      <v-card>
-        <v-card-title>Editar Solicitação Recebida</v-card-title>
-        <v-card-subtitle>
-          Ao salvar, o processo será sincronizado automaticamente com o Mapa GIS e o Inventário.
-        </v-card-subtitle>
+      <div v-if="formList.error.value && formList.items.value.length" class="flex flex-wrap items-center gap-3 border-b bg-warning-soft px-4 py-3 text-sm">
+        <span>Não foi possível atualizar a lista: {{ formList.error.value }}</span>
+        <Button variant="link" size="sm" class="h-auto px-0" @click="formList.load()">Tentar novamente</Button>
+      </div>
 
-        <v-card-text>
-          <v-form v-model="formValid" class="form-grid" @submit.prevent="save">
-            <v-text-field
-              v-model="form.company_responsible"
-              label="Empresa responsável"
-              :rules="[required]"
-              class="span-2"
-            />
-            <v-text-field
-              v-model="form.municipal_registration"
-              label="Inscrição municipal"
-              :rules="[required]"
-            />
-            <v-text-field
-              v-model="form.company_cnpj"
-              label="CNPJ"
-              placeholder="00.000.000/0000-00"
-              :rules="[optionalCnpjRule]"
-            />
-            <v-text-field
-              v-model="form.property_registration"
-              label="Inscrição imobiliária"
-              :rules="[required]"
-            />
+      <div v-if="formList.items.value.length === 0">
+        <div v-if="formList.loading.value || !formList.loaded.value" class="grid gap-3 p-4" aria-label="Carregando solicitações">
+          <Skeleton v-for="n in 4" :key="n" class="h-12" />
+        </div>
+        <EmptyState
+          v-else-if="formList.error.value"
+          :icon="CircleAlert"
+          title="Não foi possível carregar as solicitações"
+          :description="formList.error.value"
+        >
+          <Button variant="outline" @click="formList.load()">Tentar novamente</Button>
+        </EmptyState>
+        <EmptyState
+          v-else
+          :icon="Inbox"
+          :title="formList.search.value ? 'Nenhuma solicitação encontrada' : 'Nenhuma solicitação recebida'"
+          :description="formList.search.value ? 'Tente outro termo de busca.' : 'Os pedidos enviados pelo formulário público aparecem aqui.'"
+        />
+      </div>
 
-            <div class="span-2 form-section-title">
-              <div>
-                <strong>Coordenadas geográficas</strong>
-                <span>Use a localização do dispositivo ou informe manualmente.</span>
-              </div>
-              <v-btn
-                variant="tonal"
-                color="primary"
-                prepend-icon="mdi-crosshairs-gps"
-                :loading="locating"
-                @click="captureCoordinates"
-              >
-                Captar Coordenadas
-              </v-btn>
+      <template v-else>
+        <ul class="divide-y xl:hidden">
+          <li v-for="item in formList.items.value" :key="item.id" class="px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="font-medium">{{ item.process_code }}</p>
+              <StatusBadge :status="item.status" />
             </div>
-            <v-text-field
-              v-model.number="form.latitude"
-              label="Latitude"
-              type="number"
-              step="any"
-              :rules="[coordinateRule(-20.65, -20.30, 'Latitude')]"
-            />
-            <v-text-field
-              v-model.number="form.longitude"
-              label="Longitude"
-              type="number"
-              step="any"
-              :rules="[coordinateRule(-54.80, -54.40, 'Longitude')]"
-            />
+            <p class="mt-1">{{ item.company_responsible }}</p>
+            <p class="mt-0.5 text-sm text-muted-foreground">{{ item.street }}, {{ item.number }}, {{ item.district }}</p>
+            <p class="text-sm text-muted-foreground">{{ mediaTypeLabel(item.media_type) }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <Button v-if="item.status === 'novos processos'" size="sm" :disabled="saving" @click="startAnalysis(item)">
+                <Play />
+                Iniciar análise
+              </Button>
+              <Button variant="outline" size="sm" @click="openEdit(item)"><Pencil />Editar</Button>
+              <Button variant="outline" size="sm" @click="viewOnMap(item)"><MapPin />Mapa</Button>
+              <Button v-if="auth.canDelete" variant="ghost" size="sm" class="text-destructive hover:bg-danger-soft hover:text-destructive" @click="askDelete(item)">
+                <Trash2 />Excluir
+              </Button>
+            </div>
+          </li>
+        </ul>
 
-            <v-text-field v-model="form.street" label="Rua" :rules="[required]" />
-            <v-text-field v-model="form.number" label="Número" :rules="[required]" />
-            <v-select v-model="form.district" :items="DISTRICT_OPTIONS" label="Bairro" :rules="[required]" />
-            <v-text-field v-model="form.postal_code" label="CEP" placeholder="00000-000" :rules="[postalCodeRule]" />
-
-            <v-select
-              v-model="form.media_type"
-              :items="registrationMediaTypeOptions"
-              label="Tipo de veículo"
-              :rules="[required]"
-              class="span-2"
-            />
-            <v-text-field
-              v-model="form.number_of_faces"
-              label="Quantidade de faces"
-              hint="Opcional"
-              persistent-hint
-            />
-            <v-text-field
-              v-model="form.expiration_date"
-              label="Vencimento da autorização"
-              type="date"
-              hint="Opcional"
-              persistent-hint
-            />
-            <v-alert color="primary" variant="tonal" density="compact" class="span-2">
-              Raio registrado: {{ registeredRadius == null ? 'carregando ou indisponível' : `${registeredRadius}m` }}.
-              <template v-if="currentRadiusAvailable"> Raio pela regra atual (prévia): {{ calculatedRadius }}m.</template>
-              <template v-else> A classificação histórica não permite uma prévia segura pela regra atual.</template>
-            </v-alert>
-
-            <v-text-field
-              v-model="form.requester_email"
-              label="E-mail do requerente"
-              type="email"
-              :rules="[required, emailRule]"
-              class="span-2"
-            />
-
-            <div v-if="uploadedAttachments.length" class="attachment-crud span-2">
-              <div class="attachment-crud-header">
-                <strong>Documentos enviados pelo formulário público</strong>
-                <span>Os arquivos ficam em armazenamento privado e o acesso exige login.</span>
-              </div>
-              <div class="attachment-link-list">
-                <div v-for="attachment in uploadedAttachments" :key="attachment.id" class="attachment-link-item">
-                  <v-btn
-                    variant="text"
-                    prepend-icon="mdi-download-outline"
-                    class="attachment-link-button"
-                    @click="downloadUploadedAttachment(attachment)"
+        <Table class="hidden xl:table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Processo</TableHead>
+              <TableHead>Empresa responsável</TableHead>
+              <TableHead>Local</TableHead>
+              <TableHead>Tipo de veículo</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead class="hidden 2xl:table-cell">Atualização</TableHead>
+              <TableHead class="w-px"><span class="sr-only">Ações</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="item in formList.items.value" :key="item.id">
+              <TableCell class="font-medium whitespace-nowrap">{{ item.process_code }}</TableCell>
+              <TableCell class="min-w-48">
+                {{ item.company_responsible }}
+                <span class="block text-sm text-muted-foreground">
+                  <template v-if="item.company_cnpj">CNPJ {{ item.company_cnpj }}<br /></template>
+                  Inscrição {{ item.municipal_registration }}
+                </span>
+              </TableCell>
+              <TableCell class="min-w-44">
+                {{ item.street }}, {{ item.number }}
+                <span class="block text-sm text-muted-foreground">{{ item.district }}</span>
+              </TableCell>
+              <TableCell class="min-w-36">{{ mediaTypeLabel(item.media_type) }}</TableCell>
+              <TableCell class="whitespace-nowrap">{{ formatDate(item.expiration_date) }}</TableCell>
+              <TableCell><StatusBadge :status="item.status" /></TableCell>
+              <TableCell class="hidden text-sm whitespace-nowrap text-muted-foreground 2xl:table-cell">{{ formatDateTime(item.updated_at) }}</TableCell>
+              <TableCell>
+                <div class="flex justify-end gap-1">
+                  <Button
+                    v-if="item.status === 'novos processos'"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-primary"
+                    :aria-label="`Iniciar análise de ${item.process_code}`"
+                    title="Iniciar análise"
+                    :disabled="saving"
+                    @click="startAnalysis(item)"
                   >
-                    {{ attachmentCategoryLabel(attachment.category) }} · {{ attachment.original_filename }}
-                  </v-btn>
-                </div>
-              </div>
-            </div>
-
-            <div class="attachment-crud span-2">
-              <div class="attachment-crud-header">
-                <strong>Links dos anexos</strong>
-                <span>Adicione fotos, documentos, PDFs ou outros arquivos relacionados.</span>
-              </div>
-              <div class="attachment-crud-row">
-                <v-text-field
-                  v-model="attachmentDraft"
-                  label="Adicionar link"
-                  placeholder="https://..."
-                  hide-details
-                  @keydown.enter.prevent="addAttachment"
-                />
-                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addAttachment">
-                  Adicionar
-                </v-btn>
-              </div>
-              <div v-if="attachmentLinks.length" class="attachment-link-list">
-                <div v-for="(link, index) in attachmentLinks" :key="`${link}-${index}`" class="attachment-link-item">
-                  <v-btn
-                    :href="link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="text"
-                    prepend-icon="mdi-open-in-new"
-                    class="attachment-link-button"
+                    <Play />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" :aria-label="`Ver ${item.process_code} no mapa`" title="Ver no mapa" @click="viewOnMap(item)">
+                    <MapPin />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" :aria-label="`Editar ${item.process_code}`" title="Editar" @click="openEdit(item)">
+                    <Pencil />
+                  </Button>
+                  <Button
+                    v-if="auth.canDelete"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-destructive hover:bg-danger-soft hover:text-destructive"
+                    :aria-label="`Excluir ${item.process_code}`"
+                    title="Excluir solicitação e ponto"
+                    @click="askDelete(item)"
                   >
-                    {{ link }}
-                  </v-btn>
-                  <v-btn icon="mdi-close" size="small" variant="text" color="error" @click="removeAttachment(index)" />
+                    <Trash2 />
+                  </Button>
                 </div>
-              </div>
-              <div v-else class="attachment-link-empty">Nenhum link adicionado.</div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </template>
+
+      <TablePager
+        :offset="(formList.page.value - 1) * formList.pageSize.value"
+        :limit="formList.pageSize.value"
+        :total="formList.total.value"
+        :count="formList.items.value.length"
+        :loading="formList.loading.value"
+        @change="(direction) => formList.changePage(formList.page.value + direction)"
+      >
+        <label class="flex items-center gap-2">
+          <span class="hidden sm:inline">Por página</span>
+          <Select :model-value="String(formList.pageSize.value)" @update:model-value="formList.changePageSize(Number($event))">
+            <SelectTrigger size="sm" class="w-20" aria-label="Itens por página"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="size in [25, 50, 100]" :key="size" :value="String(size)">{{ size }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+      </TablePager>
+    </div>
+
+    <Dialog :open="dialog" @update:open="dialog = $event">
+      <DialogScrollContent class="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Editar solicitação</DialogTitle>
+          <DialogDescription>Ao salvar, o processo é atualizado também no Mapa GIS e no Inventário.</DialogDescription>
+        </DialogHeader>
+
+        <form id="application-form" class="grid gap-6" novalidate @submit.prevent="save">
+          <Alert v-if="message && messageType !== 'success'" :variant="messageType === 'error' ? 'destructive' : 'default'">
+            <CircleAlert />
+            <AlertDescription>{{ message }}</AlertDescription>
+          </Alert>
+
+          <FormSection title="Responsável">
+            <FormField v-slot="{ id, invalid }" label="Empresa responsável" required :error="show(errors.company_responsible)" class="sm:col-span-2">
+              <Input :id="id" v-model="form.company_responsible" :aria-invalid="invalid || undefined" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="CNPJ" :error="show(errors.company_cnpj)">
+              <Input :id="id" :model-value="form.company_cnpj ?? ''" placeholder="00.000.000/0000-00" inputmode="numeric" :aria-invalid="invalid || undefined" @update:model-value="form.company_cnpj = String($event)" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Inscrição municipal" required :error="show(errors.municipal_registration)">
+              <Input :id="id" v-model="form.municipal_registration" :aria-invalid="invalid || undefined" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Inscrição imobiliária" required :error="show(errors.property_registration)">
+              <Input :id="id" v-model="form.property_registration" :aria-invalid="invalid || undefined" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="E-mail do requerente" required :error="show(errors.requester_email)">
+              <Input :id="id" v-model="form.requester_email" type="email" :aria-invalid="invalid || undefined" />
+            </FormField>
+          </FormSection>
+
+          <FormSection title="Localização">
+            <template #actions>
+              <Button type="button" variant="outline" size="sm" :disabled="locating" @click="captureCoordinates">
+                <LoaderCircle v-if="locating" class="animate-spin" />
+                <Crosshair v-else />
+                Usar minha localização
+              </Button>
+            </template>
+            <FormField v-slot="{ id, invalid }" label="Latitude" required :error="show(errors.latitude)">
+              <Input :id="id" :model-value="form.latitude" type="number" step="any" :aria-invalid="invalid || undefined" @update:model-value="form.latitude = Number($event)" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Longitude" required :error="show(errors.longitude)">
+              <Input :id="id" :model-value="form.longitude" type="number" step="any" :aria-invalid="invalid || undefined" @update:model-value="form.longitude = Number($event)" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Rua" required :error="show(errors.street)">
+              <Input :id="id" v-model="form.street" :aria-invalid="invalid || undefined" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Número" required :error="show(errors.number)">
+              <Input :id="id" v-model="form.number" :aria-invalid="invalid || undefined" />
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="Bairro" required :error="show(errors.district)">
+              <Select v-model="form.district">
+                <SelectTrigger :id="id" class="w-full" :aria-invalid="invalid || undefined"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent class="max-h-72">
+                  <SelectItem v-for="district in DISTRICT_OPTIONS" :key="district" :value="district">{{ district }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField v-slot="{ id, invalid }" label="CEP" required :error="show(errors.postal_code)">
+              <Input :id="id" v-model="form.postal_code" placeholder="00000-000" inputmode="numeric" :aria-invalid="invalid || undefined" />
+            </FormField>
+          </FormSection>
+
+          <FormSection title="Veículo">
+            <FormField v-slot="{ id, invalid }" label="Tipo de veículo" required :error="show(errors.media_type)" class="sm:col-span-2">
+              <Select v-model="form.media_type">
+                <SelectTrigger :id="id" class="w-full" :aria-invalid="invalid || undefined"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="option in registrationMediaTypeOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField v-slot="{ id }" label="Quantidade de faces" hint="Opcional">
+              <Input :id="id" :model-value="form.number_of_faces ?? ''" @update:model-value="form.number_of_faces = String($event)" />
+            </FormField>
+            <FormField v-slot="{ id }" label="Vencimento da autorização" hint="Opcional">
+              <Input :id="id" :model-value="form.expiration_date ?? ''" type="date" @update:model-value="form.expiration_date = String($event) || null" />
+            </FormField>
+            <div class="flex gap-3 rounded-md bg-secondary px-4 py-3 text-sm sm:col-span-2">
+              <Ruler class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+              <p>
+                Raio registrado:
+                <strong class="tabular">{{ registeredRadius == null ? 'carregando ou indisponível' : `${registeredRadius} m` }}</strong>.
+                <template v-if="currentRadiusAvailable"> Pela regra atual, seria <strong class="tabular">{{ calculatedRadius }} m</strong>.</template>
+                <template v-else> A classificação histórica não permite calcular uma prévia segura pela regra atual.</template>
+              </p>
             </div>
-          </v-form>
-        </v-card-text>
+          </FormSection>
 
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="saving" :disabled="!formValid" @click="save">
-            Salvar Alterações
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <div v-if="uploadedAttachments.length" class="grid gap-2">
+            <h3 class="font-medium">Documentos enviados pelo formulário público</h3>
+            <p class="-mt-1 text-sm text-muted-foreground">Ficam em armazenamento privado; o acesso exige login.</p>
+            <ul class="divide-y rounded-md border">
+              <li v-for="attachment in uploadedAttachments" :key="attachment.id" class="flex items-center gap-3 px-4 py-2.5">
+                <Paperclip class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate" :title="attachment.original_filename">{{ attachment.original_filename }}</p>
+                  <p class="text-sm text-muted-foreground">{{ attachmentCategoryLabel(attachment.category) }}</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" @click="downloadUploadedAttachment(attachment)">
+                  <Download />
+                  Abrir
+                </Button>
+              </li>
+            </ul>
+          </div>
 
-    <v-dialog :model-value="Boolean(deleteTarget)" max-width="480" @update:model-value="!$event && (deleteTarget = null)">
-      <v-card title="Excluir solicitação recebida">
-        <v-card-text>
-          Excluir a solicitação de <strong>{{ deleteTarget?.company_responsible }}</strong> também removerá o processo
-          <strong class="process-code">{{ deleteTarget?.process_code }}</strong> do mapa e do inventário.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="deleteTarget = null">Cancelar</v-btn>
-          <v-btn color="error" :loading="saving" @click="confirmDelete">Excluir Solicitação e Ponto</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <AttachmentLinksEditor v-model="attachmentLinks" />
+        </form>
+
+        <DialogFooter>
+          <Button variant="outline" @click="dialog = false">Cancelar</Button>
+          <Button type="submit" form="application-form" :disabled="saving">
+            <LoaderCircle v-if="saving" class="animate-spin" />
+            Salvar alterações
+          </Button>
+        </DialogFooter>
+      </DialogScrollContent>
+    </Dialog>
+
+    <AlertDialog :open="Boolean(deleteTarget)" @update:open="!$event && (deleteTarget = null)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir a solicitação {{ deleteTarget?.process_code }}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A solicitação de {{ deleteTarget?.company_responsible }} sai do sistema junto com o ponto no mapa e no inventário.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <Alert v-if="message && messageType === 'error'" variant="destructive">
+          <CircleAlert />
+          <AlertDescription>{{ message }}</AlertDescription>
+        </Alert>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="deleteTarget = null">Cancelar</Button>
+          <Button variant="destructive" :disabled="saving" @click="confirmDelete">
+            <LoaderCircle v-if="saving" class="animate-spin" />
+            Excluir solicitação e ponto
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </section>
 </template>
 
 <script setup lang="ts">
+import {
+  CircleAlert,
+  CircleCheck,
+  Crosshair,
+  Download,
+  Inbox,
+  LoaderCircle,
+  MapPin,
+  Paperclip,
+  Pencil,
+  Play,
+  Ruler,
+  Trash2,
+  X,
+} from '@lucide/vue';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+
+import EmptyState from '@/components/common/EmptyState.vue';
+import SearchInput from '@/components/common/SearchInput.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
+import TablePager from '@/components/common/TablePager.vue';
+import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
+import FormField from '@/components/form/FormField.vue';
+import FormSection from '@/components/form/FormSection.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { api } from '../services/api';
 import {
@@ -332,15 +354,13 @@ import {
   canPreviewCurrentRadius,
   mediaTypeLabel,
   mediaTypeOptionsFromRules,
-  statusColor,
-  statusLabel,
 } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
 import { useApplicationFormList } from '../stores/application-form-list';
 import { useMediaStore } from '../stores/media';
 import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput } from '../types';
 import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
-import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
+import { joinAttachmentLinks, parseAttachmentLinks } from '../utils/attachment-links';
 import { formatDate, formatDateTime } from '../utils/format';
 
 const router = useRouter();
@@ -350,27 +370,44 @@ const formList = useApplicationFormList();
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<ApplicationForm | null>(null);
-const formValid = ref(false);
+const attempted = ref(false);
 const saving = ref(false);
 const locating = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error' | 'info'>('success');
-const attachmentDraft = ref('');
 const attachmentLinks = ref<string[]>([]);
 const uploadedAttachments = ref<ApplicationFormAttachment[]>([]);
 const registeredRadius = ref<number | null>(null);
 const form = reactive<ApplicationFormInput>(blankForm());
 
-const required = (value: string) => Boolean(String(value ?? '').trim()) || 'Campo obrigatório.';
-const emailRule = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'E-mail inválido.';
-const postalCodeRule = (value: string) => /^\d{5}-?\d{3}$/.test(value) || 'Informe um CEP válido.';
-const optionalCnpjRule = (value: string | null | undefined) => {
-  const digits = String(value ?? '').replace(/\D/g, '');
-  return !digits || digits.length === 14 || 'O CNPJ deve conter 14 dígitos.';
-};
-const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
-  (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
-);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const blank = (value: unknown) => !String(value ?? '').trim();
+const inRange = (value: number, min: number, max: number) => Number(value) >= min && Number(value) <= max;
+
+const errors = computed(() => {
+  const cnpjDigits = String(form.company_cnpj ?? '').replace(/\D/g, '');
+  return {
+    company_responsible: blank(form.company_responsible) ? 'Informe a empresa responsável.' : null,
+    company_cnpj: cnpjDigits && cnpjDigits.length !== 14 ? 'O CNPJ deve ter 14 dígitos.' : null,
+    municipal_registration: blank(form.municipal_registration) ? 'Informe a inscrição municipal.' : null,
+    property_registration: blank(form.property_registration) ? 'Informe a inscrição imobiliária.' : null,
+    latitude: inRange(form.latitude, -20.65, -20.30) ? null : 'Latitude fora da área de Campo Grande.',
+    longitude: inRange(form.longitude, -54.80, -54.40) ? null : 'Longitude fora da área de Campo Grande.',
+    street: blank(form.street) ? 'Informe a rua.' : null,
+    number: blank(form.number) ? 'Informe o número.' : null,
+    district: blank(form.district) ? 'Selecione o bairro.' : null,
+    postal_code: /^\d{5}-?\d{3}$/.test(form.postal_code) ? null : 'Informe um CEP válido.',
+    media_type: blank(form.media_type) ? 'Selecione o tipo de veículo.' : null,
+    requester_email: blank(form.requester_email)
+      ? 'Informe o e-mail.'
+      : EMAIL_PATTERN.test(form.requester_email) ? null : 'E-mail inválido.',
+  };
+});
+const formValid = computed(() => Object.values(errors.value).every((message) => !message));
+
+function show(message: string | null) {
+  return attempted.value ? message : null;
+}
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
 const calculatedRadius = computed(() => getRequiredRadius(form.media_type, form.area_m2, media.rules, form.area_rule_classification));
@@ -437,6 +474,8 @@ function openEdit(item: ApplicationForm) {
   });
   resetAttachments(item.attachment_links);
   uploadedAttachments.value = item.attachments ?? [];
+  attempted.value = false;
+  message.value = '';
   dialog.value = true;
 }
 
@@ -463,18 +502,11 @@ function captureCoordinates() {
 
 function resetAttachments(value: string | null | undefined) {
   attachmentLinks.value = parseAttachmentLinks(value);
-  attachmentDraft.value = '';
 }
 
-function addAttachment() {
-  const link = normalizeAttachmentLink(attachmentDraft.value);
-  if (!link) return;
-  if (!attachmentLinks.value.includes(link)) attachmentLinks.value = [...attachmentLinks.value, link];
-  attachmentDraft.value = '';
-}
-
-function removeAttachment(index: number) {
-  attachmentLinks.value = attachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
+function askDelete(item: ApplicationForm) {
+  message.value = '';
+  deleteTarget.value = item;
 }
 
 async function downloadUploadedAttachment(attachment: ApplicationFormAttachment) {
@@ -506,6 +538,7 @@ function sanitizeForm(): ApplicationFormInput {
 }
 
 async function save() {
+  attempted.value = true;
   if (!formValid.value || !editingId.value) return;
   saving.value = true;
   try {
@@ -561,30 +594,3 @@ function showMessage(text: string, type: 'success' | 'error' | 'info') {
   messageType.value = type;
 }
 </script>
-
-<style scoped>
-.form-section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 4px 0;
-}
-
-.form-section-title div {
-  display: grid;
-  gap: 2px;
-}
-
-.form-section-title span {
-  color: var(--gm-muted);
-  font-size: 0.82rem;
-}
-
-@media (max-width: 700px) {
-  .form-section-title {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-</style>

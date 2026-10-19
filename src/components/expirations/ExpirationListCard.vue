@@ -61,7 +61,7 @@
           </TableCell>
           <TableCell class="min-w-40">{{ mediaTypeLabel(asset.media_type) }}</TableCell>
           <TableCell><StatusBadge :status="asset.status" /></TableCell>
-          <TableCell class="tabular whitespace-nowrap">{{ formatDate(asset.expiration_date) }}</TableCell>
+          <TableCell class="whitespace-nowrap">{{ formatDate(asset.expiration_date) }}</TableCell>
           <TableCell :class="['whitespace-nowrap font-medium', mode === 'expired' ? 'text-destructive' : 'text-warning']">
             {{ deadlineLabel(asset) }}
           </TableCell>
