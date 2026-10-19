@@ -5,12 +5,9 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-import { SCENES } from '@/components/login/login-background-scenes';
-import type { LoginBackgroundId } from '@/composables/useLoginBackground';
-
-const props = defineProps<{ variant: LoginBackgroundId }>();
+import { loginScene } from '@/components/login/login-background-scenes';
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let frame = 0;
@@ -25,10 +22,10 @@ function stop() {
 
 function start() {
   stop();
-  const scene = SCENES[props.variant];
+  const scene = loginScene;
   const element = canvas.value;
   const ctx = element?.getContext('2d');
-  if (!scene || !element || !ctx) return;
+  if (!element || !ctx) return;
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let width = 0;
@@ -56,6 +53,5 @@ function start() {
 }
 
 onMounted(start);
-watch(() => props.variant, () => requestAnimationFrame(start));
 onBeforeUnmount(stop);
 </script>

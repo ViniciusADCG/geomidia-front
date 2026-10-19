@@ -99,6 +99,7 @@
     </AlertDialog>
   </div>
 
+  <WelcomeOverlay />
   <LogoPicker v-if="showLogoPicker" />
 </template>
 
@@ -122,6 +123,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import WelcomeOverlay from '@/components/welcome/WelcomeOverlay.vue';
 
 import type { ApprovalConflictPrompt } from './types';
 import { APPROVAL_CONFLICT_EVENT } from './utils/approval-conflict-confirmation';

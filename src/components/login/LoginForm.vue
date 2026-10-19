@@ -97,11 +97,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 
+import { useWelcome } from '@/composables/useWelcome';
 import { useAuthStore } from '@/stores/auth';
 
 defineProps<{ dark?: boolean }>();
 
 const auth = useAuthStore();
+const welcome = useWelcome();
 const route = useRoute();
 const router = useRouter();
 const username = ref('');
@@ -133,6 +135,7 @@ async function submit() {
   errorMessage.value = '';
   try {
     await auth.login(username.value.trim(), password.value, remember.value);
+    welcome.play();
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
     await router.replace(redirect);
   } catch (error) {

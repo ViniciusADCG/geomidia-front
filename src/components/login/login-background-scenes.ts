@@ -177,8 +177,7 @@ function createPassagem(o: PassagemOptions): Scene {
   };
 }
 
-export const SCENES: Record<string, Scene> = {
-  discreta: createPassagem({ cars: 8, speed: [60, 110], length: [50, 100], spawnChance: 0.5, life: 6, burst: false, glow: false, rise: false }),
-  destaque: createPassagem({ cars: 6, speed: [60, 100], length: [50, 100], spawnChance: 1, life: 6, burst: true, glow: false, rise: false }),
-  calma: createPassagem({ cars: 5, speed: [30, 50], length: [120, 190], spawnChance: 1, life: 10, burst: false, glow: true, rise: true }),
-};
+// Fundo definitivo: toda passagem faz surgir uma placa, com um anel que se expande e assenta no raio.
+export const loginScene: Scene = createPassagem({
+  cars: 6, speed: [60, 100], length: [50, 100], spawnChance: 1, life: 6, burst: true, glow: false, rise: false,
+});
