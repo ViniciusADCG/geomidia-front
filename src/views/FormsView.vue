@@ -238,7 +238,7 @@
             <FormField v-slot="{ id }" label="Vencimento da autorização" hint="Opcional">
               <Input :id="id" :model-value="form.expiration_date ?? ''" type="date" @update:model-value="form.expiration_date = String($event) || null" />
             </FormField>
-            <div class="flex gap-3 rounded-md bg-secondary px-4 py-3 text-sm sm:col-span-2">
+            <div class="flex gap-3 rounded-md bg-secondary px-4 py-3 text-sm text-foreground sm:col-span-2">
               <Ruler class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
               <p>
                 Raio registrado:

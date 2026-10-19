@@ -2,7 +2,7 @@
   <v-app :class="route.meta.public ? 'public-shell' : 'admin-shell'">
     <router-view v-if="route.meta.public" />
 
-    <div v-else class="min-h-dvh bg-background">
+    <div v-else class="min-h-dvh bg-background text-foreground">
       <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64">
         <app-sidebar
           :active-name="route.name"
