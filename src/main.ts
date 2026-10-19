@@ -1,6 +1,8 @@
 import '@mdi/font/css/materialdesignicons.css';
 import 'leaflet/dist/leaflet.css';
+import '@fontsource-variable/onest';
 import 'vuetify/styles';
+import './styles/tailwind.css';
 import './styles/main.css';
 
 import { createPinia } from 'pinia';
