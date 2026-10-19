@@ -27,3 +27,9 @@ export function welcomeMessage(fullName: string | null | undefined, date: Date):
   const name = firstName(fullName);
   return name ? `${greeting}, ${name}` : greeting;
 }
+
+// Despedida ao sair do painel.
+export function farewellMessage(fullName: string | null | undefined): string {
+  const name = firstName(fullName);
+  return name ? `Até logo, ${name}` : 'Até logo';
+}

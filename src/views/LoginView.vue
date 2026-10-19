@@ -1,6 +1,10 @@
 <template>
   <main
-    :class="['relative flex min-h-dvh flex-col px-4 py-6 sm:px-8', leaving && 'login-leaving']"
+    :class="[
+      'relative flex min-h-dvh flex-col px-4 py-6 sm:px-8',
+      leaving && 'login-leaving',
+      arriving && 'login-arriving',
+    ]"
   >
     <LoginBackground />
     <header class="login-chrome relative"><BrandLockup tone="onDark" :height="34" /></header>
@@ -23,10 +27,14 @@ import BrandLockup from '@/components/brand/BrandLockup.vue';
 import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
 import LoginBackground from '@/components/login/LoginBackground.vue';
 import LoginForm from '@/components/login/LoginForm.vue';
+import { useFarewell } from '@/composables/useFarewell';
 import { useWelcome } from '@/composables/useWelcome';
 
 const welcome = useWelcome();
+const farewell = useFarewell();
 const leaving = computed(() => welcome.phase.value === 'leaving');
+// Voltando do painel depois de sair: o cartão reaparece saindo do desfoque.
+const arriving = computed(() => farewell.phase.value === 'arriving');
 </script>
 
 <style scoped>
@@ -50,6 +58,24 @@ const leaving = computed(() => welcome.phase.value === 'leaving');
 @keyframes leave-flatten {
   40% { transform: scaleY(0.012); background-color: var(--color-brand-yellow); opacity: 1; }
   100% { transform: scale(0, 0.012); background-color: var(--color-brand-yellow); opacity: 1; }
+}
+
+/* Volta ao login depois de sair: marcas e rodapé reaparecem e o cartão volta. */
+.login-arriving .login-chrome {
+  animation: arrive-fade 400ms ease-out both;
+}
+
+@keyframes arrive-fade {
+  from { opacity: 0; }
+}
+
+/* O cartão aparece saindo do desfoque, depois que a cidade cobriu o painel. */
+.login-arriving .login-card {
+  animation: arrive-blur 550ms ease-out both;
+}
+
+@keyframes arrive-blur {
+  from { opacity: 0; filter: blur(12px); transform: scale(0.94); }
 }
 
 @media (prefers-reduced-motion: reduce) {

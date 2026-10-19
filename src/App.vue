@@ -108,6 +108,7 @@
   </div>
 
   <WelcomeOverlay />
+  <FarewellOverlay />
 </template>
 
 <script setup lang="ts">
@@ -132,7 +133,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import FarewellOverlay from '@/components/welcome/FarewellOverlay.vue';
 import WelcomeOverlay from '@/components/welcome/WelcomeOverlay.vue';
+import { useFarewell } from '@/composables/useFarewell';
 
 import type { ApprovalConflictPrompt } from './types';
 import { APPROVAL_CONFLICT_EVENT } from './utils/approval-conflict-confirmation';
@@ -147,6 +150,7 @@ const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
 const isDesktop = useMediaQuery('(min-width: 1024px)');
+const farewell = useFarewell();
 
 const drawer = ref(false);
 const confirmLogout = ref(false);
@@ -257,10 +261,12 @@ function handleUnauthorized(event: Event) {
   void router.push({ name: 'login' });
 }
 
-function logout() {
+async function logout() {
   confirmLogout.value = false;
+  await farewell.leave(auth.userName);
   exitVisualPreview();
   auth.logout();
-  void router.push({ name: 'login' });
+  await router.push({ name: 'login' });
+  farewell.arrive();
 }
 </script>

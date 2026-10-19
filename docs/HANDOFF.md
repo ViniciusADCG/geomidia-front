@@ -36,6 +36,7 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 | Layout do login | Cartão sobre fundo animado | `src/views/LoginView.vue` |
 | Fundo do login | Avenidas e quadras; cada carro que passa faz surgir uma placa com o raio mínimo e um anel ("Destaque na passagem") | `src/components/login/login-background-scenes.ts` |
 | Boas-vindas | "Pino pousa": cartão vira linha amarela, símbolo se monta com Bom dia (5h–12h) / Boa tarde (12h–18h) / Boa noite e voa ao logo da faixa | `src/components/welcome/WelcomeOverlay.vue`, `src/composables/useWelcome.ts`, `src/lib/greeting.ts` |
+| Saída | "Cidade sai do logo": a cidade do login se abre em círculo a partir do logo da faixa, "Até logo, Nome", e o cartão do login volta saindo do desfoque | `src/components/welcome/FarewellOverlay.vue`, `src/composables/useFarewell.ts` |
 | Casca do painel | "Faixa institucional" + "Abas com menus" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppTopNav.vue`, `nav-items.ts` |
 
 Todas as animações respeitam `prefers-reduced-motion`. A de boas-vindas pode ser pulada com clique ou Esc.

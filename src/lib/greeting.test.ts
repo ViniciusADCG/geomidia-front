@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayPeriod, firstName, welcomeMessage } from './greeting';
+import { dayPeriod, farewellMessage, firstName, welcomeMessage } from './greeting';
 
 const at = (hour: number, minute = 0) => new Date(2026, 9, 19, hour, minute);
 
@@ -29,5 +29,16 @@ describe('welcomeMessage', () => {
     expect(welcomeMessage(null, at(20))).toBe('Boa noite');
     expect(welcomeMessage('   ', at(20))).toBe('Boa noite');
     expect(firstName(undefined)).toBe('');
+  });
+});
+
+describe('farewellMessage', () => {
+  it('says goodbye by first name', () => {
+    expect(farewellMessage('Ana Paula Souza')).toBe('Até logo, Ana');
+  });
+
+  it('says goodbye without a name when none is known', () => {
+    expect(farewellMessage(null)).toBe('Até logo');
+    expect(farewellMessage('  ')).toBe('Até logo');
   });
 });
