@@ -1,13 +1,13 @@
 import { ref, watch } from 'vue';
 
-// Fundos animados da tela de login em avaliação. A troca só existe em desenvolvimento;
+// Variações do fundo animado Avenidas da tela de login, em avaliação. A troca só existe em desenvolvimento;
 // em produção vale o primeiro da lista.
 export const LOGIN_BACKGROUNDS = [
-  { id: 'mapa', name: 'Mapa vivo', idea: 'Quarteirões em perspectiva deslizando devagar; lotes acendem como veículos sendo cadastrados.' },
-  { id: 'raios', name: 'Raios', idea: 'Pontos espalhados emitem círculos que se expandem: o raio mínimo de cada veículo.' },
-  { id: 'cidade', name: 'Cidade em movimento', idea: 'A foto de Campo Grande com zoom muito lento e luzes piscando sobre a cidade.' },
-  { id: 'avenidas', name: 'Avenidas', idea: 'Malha de ruas em perspectiva com rastros de luz passando, como o trânsito diante dos painéis.' },
-  { id: 'ondas', name: 'Ondas da marca', idea: 'Os azuis da marca se movendo devagar, com linhas finas na inclinação da placa PREFCG.' },
+  { id: 'avenidas', name: 'Avenidas', idea: 'A base escolhida: malha de ruas em perspectiva com rastros de luz passando.' },
+  { id: 'rush', name: 'Hora do rush', idea: 'O dobro de carros, mais rápidos e com mais amarelo; ruas mais visíveis.' },
+  { id: 'noite', name: 'Noite calma', idea: 'Poucos carros, lentos, com rastros longos que brilham ao se cruzar.' },
+  { id: 'paineis', name: 'Avenidas com painéis', idea: 'O mesmo trânsito e painéis amarelos acendendo nos cruzamentos: os veículos de mídia.' },
+  { id: 'quadras', name: 'Avenidas e quadras', idea: 'Quarteirões preenchidos entre as ruas, como no símbolo, com o trânsito passando.' },
 ] as const;
 
 export type LoginBackgroundId = typeof LOGIN_BACKGROUNDS[number]['id'];
