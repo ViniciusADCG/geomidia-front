@@ -1,13 +1,13 @@
 import { ref, watch } from 'vue';
 
-// Variações do fundo animado Avenidas da tela de login, em avaliação. A troca só existe em desenvolvimento;
+// Fundo Avenidas e quadras da tela de login, com estilos de painel em avaliação. A troca só existe em desenvolvimento;
 // em produção vale o primeiro da lista.
 export const LOGIN_BACKGROUNDS = [
-  { id: 'avenidas', name: 'Avenidas', idea: 'A base escolhida: malha de ruas em perspectiva com rastros de luz passando.' },
-  { id: 'rush', name: 'Hora do rush', idea: 'O dobro de carros, mais rápidos e com mais amarelo; ruas mais visíveis.' },
-  { id: 'noite', name: 'Noite calma', idea: 'Poucos carros, lentos, com rastros longos que brilham ao se cruzar.' },
-  { id: 'paineis', name: 'Avenidas com painéis', idea: 'O mesmo trânsito e painéis amarelos acendendo nos cruzamentos: os veículos de mídia.' },
-  { id: 'quadras', name: 'Avenidas e quadras', idea: 'Quarteirões preenchidos entre as ruas, como no símbolo, com o trânsito passando.' },
+  { id: 'placa', name: 'Placa simples', idea: 'Plaquinhas amarelas em postes sobre as quadras, acendendo devagar.' },
+  { id: 'outdoor', name: 'Outdoor iluminado', idea: 'Outdoors largos com moldura e dois pés, com a luz pulsando.' },
+  { id: 'led', name: 'Painel de LED', idea: 'Telas que trocam de cor de tempos em tempos, como painéis digitais trocando de anúncio.' },
+  { id: 'isometrico', name: 'Isométrico', idea: 'Painéis desenhados na mesma perspectiva das ruas, alinhados à rua.' },
+  { id: 'raio', name: 'Com raio', idea: 'Cada placa com o círculo do raio mínimo em perspectiva, e um anel pulsando de dentro para fora.' },
 ] as const;
 
 export type LoginBackgroundId = typeof LOGIN_BACKGROUNDS[number]['id'];
