@@ -9,7 +9,7 @@
       </template>
     </PageHeader>
 
-    <Alert v-if="error && !dialog" variant="destructive" class="mb-4">
+    <Alert v-if="error && !dialog && !deleteTarget" variant="destructive" class="mb-4">
       <CircleAlert />
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
@@ -50,7 +50,7 @@
                   :aria-label="`Excluir ${user.full_name}`"
                   :title="user.id === auth.userId ? 'Você não pode excluir o próprio usuário' : 'Excluir'"
                   :disabled="user.id === auth.userId"
-                  @click="deleteTarget = user"
+                  @click="error = ''; deleteTarget = user"
                 >
                   <Trash2 />
                 </Button>
@@ -139,6 +139,10 @@
           <AlertDialogTitle>Excluir {{ deleteTarget?.full_name }}?</AlertDialogTitle>
           <AlertDialogDescription>O usuário perde o acesso ao GeoMídia. Essa ação não pode ser desfeita.</AlertDialogDescription>
         </AlertDialogHeader>
+        <Alert v-if="error" variant="destructive">
+          <CircleAlert />
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
         <AlertDialogFooter>
           <Button variant="outline" @click="deleteTarget = null">Cancelar</Button>
           <Button variant="destructive" :disabled="saving" @click="confirmDelete">
