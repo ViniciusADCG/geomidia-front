@@ -3,7 +3,7 @@ import type { DialogContentEmits, DialogContentProps } from "reka-ui"
 import type { HTMLAttributes } from "vue"
 import { X } from "@lucide/vue"
 import { reactiveOmit } from "@vueuse/core"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import {
   DialogClose,
   DialogContent,
@@ -51,7 +51,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
         >
           <X class="w-4 h-4" />
-          <span class="sr-only">Close</span>
+          <span class="sr-only">Fechar</span>
         </DialogClose>
       </DialogContent>
     </DialogOverlay>

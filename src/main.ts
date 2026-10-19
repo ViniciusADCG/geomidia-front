@@ -3,7 +3,6 @@ import 'leaflet/dist/leaflet.css';
 import '@fontsource-variable/onest';
 import 'vuetify/styles';
 import './styles/tailwind.css';
-import './styles/main.css';
 
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
@@ -19,7 +18,7 @@ const vuetify = createVuetify({
       geomidiaLight: {
         dark: false,
         colors: {
-          primary: '#0867c9',
+          primary: '#283587',
           secondary: '#2f6f73',
           surface: '#ffffff',
           background: '#f3f6f9',

@@ -21,7 +21,6 @@ body {
   margin: 0;
   background: var(--bg-app);
   color: var(--text-primary);
-  font-family: Inter, Roboto, Arial, sans-serif;
 }
 
 .v-card {
