@@ -1,6 +1,6 @@
 <template>
-  <div :class="cn('grid gap-1.5', props.class)">
-    <Label v-if="label" :for="id" class="text-sm font-medium">
+  <div :class="cn('grid content-start gap-1.5', props.class)">
+    <Label v-if="label" :for="id" class="gap-0.5 text-sm font-medium">
       {{ label }}<span v-if="required" class="text-destructive" aria-hidden="true"> *</span>
     </Label>
     <slot :id="id" :invalid="Boolean(error)" :described-by="describedBy" />
