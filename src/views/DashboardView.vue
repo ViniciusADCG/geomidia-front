@@ -1,96 +1,132 @@
 <template>
-  <section class="view-stack dashboard-view">
-    <div class="view-header">
-      <div>
-        <h2>Dashboard</h2>
-        <p>Visão geral do inventário municipal de mídia exterior.</p>
-      </div>
-      <div class="header-actions">
-        <v-btn v-if="auth.canWrite" variant="outlined" prepend-icon="mdi-download" :loading="exportLoading" @click="exportJson">Exportar</v-btn>
-        <v-btn v-if="auth.canWrite" color="primary" prepend-icon="mdi-plus" @click="$emit('navigate', 'inventory')">Novo Cadastro</v-btn>
-      </div>
-    </div>
+  <section>
+    <PageHeader title="Dashboard">
+      <template #description>
+        <span class="tabular">{{ media.stats.total }}</span> {{ media.stats.total === 1 ? 'ativo cadastrado' : 'ativos cadastrados' }} no inventário municipal de mídia exterior.
+      </template>
+      <template v-if="auth.canWrite" #actions>
+        <Button variant="outline" :disabled="exportLoading" @click="exportJson">
+          <LoaderCircle v-if="exportLoading" class="animate-spin" />
+          <Download v-else />
+          Exportar JSON
+        </Button>
+        <Button @click="$emit('navigate', 'inventory')">
+          <Plus />
+          Novo cadastro
+        </Button>
+      </template>
+    </PageHeader>
 
-    <div class="kpi-grid">
-      <v-card
-        v-for="card in kpis"
-        :key="card.label"
-        :class="['kpi-card', card.className, { 'kpi-card--clickable': card.to }]"
-        :to="card.to"
-        border
-      >
-        <div class="kpi-card-content">
-          <div class="kpi-heading">
-            <span class="kpi-label">{{ card.label }}</span>
-            <v-icon class="kpi-icon" :icon="card.icon" size="20" aria-hidden="true" />
-          </div>
-          <div class="kpi-card-summary">
-            <strong>{{ card.value }}</strong>
-            <small>{{ card.caption }}</small>
-          </div>
+    <div class="grid gap-4 xl:grid-cols-3">
+      <section class="rounded-lg border bg-card p-5 xl:col-span-2" aria-labelledby="pipeline-title">
+        <h2 id="pipeline-title" class="font-semibold">Andamento dos processos</h2>
+        <div class="mt-4 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          <div
+            v-for="step in pipeline"
+            :key="step.label"
+            :class="step.bar"
+            :style="{ width: `${step.share}%` }"
+          />
         </div>
-      </v-card>
-    </div>
+        <ol class="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+          <li v-for="step in pipeline" :key="step.label" class="min-w-0 sm:border-l sm:pl-4 sm:first:border-l-0 sm:first:pl-0">
+            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+              <span :class="['size-2 rounded-full', step.bar]" aria-hidden="true" />
+              {{ step.label }}
+            </p>
+            <p class="tabular mt-1 text-3xl font-semibold">{{ step.value }}</p>
+            <p class="mt-0.5 text-sm text-muted-foreground">{{ step.caption }}</p>
+          </li>
+        </ol>
+      </section>
 
-    <v-row>
-      <v-col cols="12">
-        <v-card border class="pa-5 dashboard-panel">
-          <div class="card-title-row">
-            <h3>Ativos por Tipo de Veículo</h3>
-            <v-btn variant="text" color="primary" append-icon="mdi-arrow-right" @click="$emit('navigate', 'map')">
-              Ver mapa
-            </v-btn>
+      <RouterLink
+        to="/vencimentos"
+        class="group flex flex-col rounded-lg border bg-card p-5 outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+        aria-labelledby="expiry-title"
+      >
+        <div class="flex items-center justify-between">
+          <h2 id="expiry-title" class="font-semibold">Vencimentos</h2>
+          <ChevronRight class="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+        </div>
+        <dl class="mt-4 grid flex-1 grid-cols-2 gap-4">
+          <div :class="['rounded-md p-4', media.stats.expired ? 'bg-danger-soft' : 'bg-muted']">
+            <dt class="text-sm text-muted-foreground">Vencidos</dt>
+            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expired && 'text-destructive']">{{ media.stats.expired }}</dd>
           </div>
+          <div :class="['rounded-md p-4', media.stats.expiring_soon ? 'bg-warning-soft' : 'bg-muted']">
+            <dt class="text-sm text-muted-foreground">Vencem em 90 dias</dt>
+            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expiring_soon && 'text-warning']">{{ media.stats.expiring_soon }}</dd>
+          </div>
+        </dl>
+      </RouterLink>
 
-          <div v-if="media.stats.total === 0" class="empty-state">
-            <v-icon icon="mdi-folder-open-outline" size="42" />
-            <span>Nenhum ativo cadastrado.</span>
-          </div>
-          <div v-else class="bar-list">
-            <div v-for="item in chartData" :key="item.type" class="bar-row">
-              <div class="bar-meta">
-                <span>{{ mediaTypeLabel(item.type) }}</span>
-                <strong>{{ item.count }}</strong>
-              </div>
-              <div class="bar-track">
-                <div
-                  class="bar-fill"
-                  :style="{ width: `${item.percent}%`, backgroundColor: mediaTypeColor(item.type) }"
-                />
-              </div>
+      <section class="rounded-lg border bg-card p-5 xl:col-span-2" aria-labelledby="types-title">
+        <div class="flex items-center justify-between gap-4">
+          <h2 id="types-title" class="font-semibold">Ativos por tipo de veículo</h2>
+          <Button variant="link" class="h-auto px-0" @click="$emit('navigate', 'map')">
+            Abrir no mapa
+          </Button>
+        </div>
+        <EmptyState
+          v-if="media.stats.total === 0"
+          :icon="FolderOpen"
+          title="Nenhum ativo cadastrado"
+          description="Os veículos aparecem aqui assim que forem cadastrados no inventário."
+        />
+        <ul v-else class="mt-4 grid gap-3.5">
+          <li v-for="item in chartData" :key="item.type">
+            <div class="flex items-baseline justify-between gap-4 text-sm">
+              <span class="truncate">{{ mediaTypeLabel(item.type) }}</span>
+              <span class="tabular font-semibold">{{ item.count }}</span>
             </div>
-          </div>
-        </v-card>
-      </v-col>
+            <div class="mt-1.5 h-2 rounded-full bg-muted">
+              <div
+                class="h-full rounded-full"
+                :style="{ width: `${item.percent}%`, backgroundColor: mediaTypeColor(item.type) }"
+              />
+            </div>
+          </li>
+        </ul>
+      </section>
 
-      <v-col cols="12">
-        <v-card border class="pa-5 activity-card dashboard-panel">
-          <h3>Atividades Recentes</h3>
-          <div v-if="media.activities.length === 0" class="empty-state compact">
-            <v-icon icon="mdi-clipboard-text-clock-outline" size="36" />
-            <span>Nenhuma atividade registrada.</span>
-          </div>
-          <v-list v-else density="compact" class="activity-list">
-            <v-list-item v-for="activity in media.activities" :key="activity.id" class="activity-item">
-              <template #prepend>
-                <v-chip size="x-small" :color="activityColor(activity.activity_type)" variant="tonal">
-                  {{ activity.activity_type }}
-                </v-chip>
-              </template>
-              <v-list-item-title>{{ activity.message }}</v-list-item-title>
-              <v-list-item-subtitle>
-                <span class="process-code">{{ activity.process_code }}</span> · {{ formatDateTime(activity.created_at) }}
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </v-col>
-    </v-row>
+      <section class="rounded-lg border bg-card p-5" aria-labelledby="activity-title">
+        <h2 id="activity-title" class="font-semibold">Atividades recentes</h2>
+        <EmptyState
+          v-if="media.activities.length === 0"
+          :icon="History"
+          title="Nenhuma atividade ainda"
+          description="Cadastros, aprovações e edições ficam registrados aqui."
+        />
+        <ol v-else class="mt-3 divide-y">
+          <li v-for="activity in media.activities" :key="activity.id" class="py-3 first:pt-1">
+            <div class="flex items-start justify-between gap-3">
+              <p class="min-w-0">{{ activity.message }}</p>
+              <ToneBadge :tone="activityTone(activity.activity_type)" class="capitalize">
+                {{ activityLabel(activity.activity_type) }}
+              </ToneBadge>
+            </div>
+            <p class="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+              <span class="font-medium text-foreground">{{ activity.process_code }}</span>
+              <time :datetime="activity.created_at">{{ formatDateTime(activity.created_at) }}</time>
+            </p>
+          </li>
+        </ol>
+      </section>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { ChevronRight, Download, FolderOpen, History, LoaderCircle, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { RouterLink } from 'vue-router';
+
+import EmptyState from '@/components/common/EmptyState.vue';
+import ToneBadge from '@/components/common/ToneBadge.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import { Button } from '@/components/ui/button';
+import type { Tone } from '@/lib/tones';
 
 import { MEDIA_TYPE_OPTIONS, mediaTypeColor, mediaTypeLabel } from '../domain/rules';
 import { api } from '../services/api';
@@ -105,64 +141,15 @@ const media = useMediaStore();
 const auth = useAuthStore();
 const exportLoading = ref(false);
 
-const kpis = computed(() => [
-  {
-    label: 'Total de Ativos',
-    value: media.stats.total,
-    caption: `${media.stats.total} registro(s)`,
-    icon: 'mdi-calendar-month-outline',
-    className: 'blue',
-    to: undefined,
-  },
-  {
-    label: 'Novos Processos',
-    value: media.stats.new_processes,
-    caption: 'Aguardando início da análise',
-    icon: 'mdi-inbox-arrow-down-outline',
-    className: 'cyan',
-    to: undefined,
-  },
-  {
-    label: 'Em Análise',
-    value: media.stats.pending,
-    caption: 'Processos em análise técnica',
-    icon: 'mdi-magnify',
-    className: 'amber',
-    to: undefined,
-  },
-  {
-    label: 'Autorizados',
-    value: media.stats.approved,
-    caption: 'Ativos aprovados',
-    icon: 'mdi-check-decagram-outline',
-    className: 'green',
-    to: undefined,
-  },
-  {
-    label: 'Irregulares',
-    value: media.stats.rejected,
-    caption: 'Solicitações irregulares',
-    icon: 'mdi-alert-octagon-outline',
-    className: 'red',
-    to: undefined,
-  },
-  {
-    label: 'Próximos ao Vencimento',
-    value: media.stats.expiring_soon,
-    caption: 'Vencem nos próximos 90 dias',
-    icon: 'mdi-calendar-clock-outline',
-    className: 'orange',
-    to: '/vencimentos',
-  },
-  {
-    label: 'Vencidos',
-    value: media.stats.expired,
-    caption: 'Autorizações já vencidas',
-    icon: 'mdi-calendar-remove-outline',
-    className: 'burgundy',
-    to: '/vencimentos',
-  },
-]);
+const pipeline = computed(() => {
+  const total = Math.max(media.stats.total, 1);
+  return [
+    { label: 'Novos', value: media.stats.new_processes, caption: 'Aguardam início da análise', bar: 'bg-sky-500' },
+    { label: 'Em análise', value: media.stats.pending, caption: 'Em análise técnica', bar: 'bg-amber-500' },
+    { label: 'Autorizados', value: media.stats.approved, caption: 'Ativos aprovados', bar: 'bg-emerald-600' },
+    { label: 'Irregulares', value: media.stats.rejected, caption: 'Solicitações irregulares', bar: 'bg-red-600' },
+  ].map((step) => ({ ...step, share: (step.value / total) * 100 }));
+});
 
 const chartData = computed(() => {
   const max = Math.max(...Object.values(media.stats.by_type), 1);
@@ -176,11 +163,23 @@ const chartData = computed(() => {
   });
 });
 
-function activityColor(type: ActivityType) {
+function activityTone(type: ActivityType): Tone {
   if (type === 'aprovacao') return 'success';
   if (type === 'reprovacao' || type === 'remocao') return 'error';
   if (type === 'cadastro') return 'primary';
   return 'warning';
+}
+
+const ACTIVITY_LABELS: Record<ActivityType, string> = {
+  cadastro: 'cadastro',
+  aprovacao: 'aprovação',
+  reprovacao: 'reprovação',
+  edicao: 'edição',
+  remocao: 'remoção',
+};
+
+function activityLabel(type: ActivityType): string {
+  return ACTIVITY_LABELS[type] ?? type;
 }
 
 async function exportJson() {
