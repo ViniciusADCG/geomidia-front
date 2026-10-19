@@ -1,14 +1,5 @@
-/*
- * Convivência temporária com o Vuetify (remover quando ele sair):
- * - "important": as utilities do Vuetify (px-4, text-*, ...) usam !important e têm os mesmos
- *   nomes das do Tailwind. !important dentro de camada vence !important fora de camada.
- * - o main.css legado fica na camada "legacy", acima do reset do Tailwind e abaixo das utilities.
- */
-@layer theme, base, legacy, components, utilities;
-
-@import "tailwindcss" important;
+@import "tailwindcss";
 @import "tw-animate-css";
-@import "./main.css" layer(legacy);
 
 /*
  * Tokens da identidade GeoMídia / PREFCG.

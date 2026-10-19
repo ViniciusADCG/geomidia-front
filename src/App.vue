@@ -1,105 +1,103 @@
 <template>
-  <v-app :class="route.meta.public ? 'public-shell' : 'admin-shell'">
-    <router-view v-if="route.meta.public" />
+  <router-view v-if="route.meta.public" />
 
-    <div v-else class="min-h-dvh bg-background text-foreground">
-      <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64">
+  <div v-else class="min-h-dvh bg-background text-foreground">
+    <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64">
+      <app-sidebar
+        :active-name="route.name"
+        :can-write="auth.canWrite"
+        :is-admin="auth.role === 'admin'"
+        @logout="confirmLogout = true"
+      />
+    </aside>
+
+    <Sheet v-else v-model:open="drawer">
+      <SheetContent side="left" class="w-72 gap-0 border-0 bg-sidebar p-0 sm:max-w-72">
+        <SheetTitle class="sr-only">Menu</SheetTitle>
         <app-sidebar
           :active-name="route.name"
           :can-write="auth.canWrite"
           :is-admin="auth.role === 'admin'"
-          @logout="confirmLogout = true"
+          @navigate="drawer = false"
+          @logout="drawer = false; confirmLogout = true"
         />
-      </aside>
+      </SheetContent>
+    </Sheet>
 
-      <Sheet v-else v-model:open="drawer">
-        <SheetContent side="left" class="w-72 gap-0 border-0 bg-sidebar p-0 sm:max-w-72">
-          <SheetTitle class="sr-only">Menu</SheetTitle>
-          <app-sidebar
-            :active-name="route.name"
-            :can-write="auth.canWrite"
-            :is-admin="auth.role === 'admin'"
-            @navigate="drawer = false"
-            @logout="drawer = false; confirmLogout = true"
-          />
-        </SheetContent>
-      </Sheet>
+    <div :class="isDesktop ? 'pl-64' : ''">
+      <app-topbar
+        :show-menu="!isDesktop"
+        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading)"
+        :role-label="roleLabel"
+        :user-name="auth.userName"
+        @toggle-menu="drawer = !drawer"
+        @refresh="refreshCurrentView"
+      />
 
-      <div :class="isDesktop ? 'pl-64' : ''">
-        <app-topbar
-          :show-menu="!isDesktop"
-          :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading)"
-          :role-label="roleLabel"
-          :user-name="auth.userName"
-          @toggle-menu="drawer = !drawer"
-          @refresh="refreshCurrentView"
-        />
+      <main class="mx-auto w-full max-w-[1760px] px-4 py-6 lg:px-8 lg:py-8">
+        <Alert v-if="auth.error || media.error" variant="destructive" class="mb-6 pr-12">
+          <CircleAlert />
+          <AlertDescription>{{ auth.error || media.error }}</AlertDescription>
+          <button
+            type="button"
+            class="absolute top-2.5 right-2.5 rounded-sm p-1 opacity-70 hover:opacity-100"
+            aria-label="Fechar aviso"
+            @click="auth.error = null; media.error = null"
+          >
+            <X class="size-4" />
+          </button>
+        </Alert>
 
-        <main class="mx-auto w-full max-w-[1760px] px-4 py-6 lg:px-8 lg:py-8">
-          <Alert v-if="auth.error || media.error" variant="destructive" class="mb-6 pr-12">
-            <CircleAlert />
-            <AlertDescription>{{ auth.error || media.error }}</AlertDescription>
-            <button
-              type="button"
-              class="absolute top-2.5 right-2.5 rounded-sm p-1 opacity-70 hover:opacity-100"
-              aria-label="Fechar aviso"
-              @click="auth.error = null; media.error = null"
-            >
-              <X class="size-4" />
-            </button>
-          </Alert>
-
-          <router-view v-slot="{ Component }">
-            <component :is="Component" @navigate="navigate" @view-map="handleViewOnMap" />
-          </router-view>
-        </main>
-      </div>
-
-      <AlertDialog :open="confirmLogout" @update:open="confirmLogout = $event">
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sair do GeoMídia?</AlertDialogTitle>
-            <AlertDialogDescription>Sua sessão será encerrada neste navegador.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button variant="outline" @click="confirmLogout = false">Cancelar</Button>
-            <Button variant="destructive" @click="logout">Sair</Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog :open="approvalConflictDialog" @update:open="(open) => { if (!open) resolveApprovalConflict(false); }">
-        <AlertDialogContent class="sm:max-w-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Conflito territorial identificado</AlertDialogTitle>
-            <AlertDialogDescription class="text-foreground">{{ approvalConflict?.message }}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <ul v-if="approvalConflict?.conflicts.length" class="divide-y rounded-md border">
-            <li
-              v-for="conflict in approvalConflict.conflicts"
-              :key="conflict.conflicting_asset_id"
-              class="flex items-start gap-3 px-4 py-3"
-            >
-              <TriangleAlert class="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-              <div>
-                <p class="tabular font-semibold">{{ conflict.process_code }}</p>
-                <p class="tabular text-sm text-muted-foreground">
-                  {{ Math.round(conflict.distance_meters) }} m de distância; mínimo {{ conflict.minimum_distance_meters }} m
-                </p>
-              </div>
-            </li>
-          </ul>
-          <p class="text-sm text-muted-foreground">
-            Você pode aprovar mesmo assim. A decisão e os conflitos encontrados ficam registrados no histórico do processo.
-          </p>
-          <AlertDialogFooter>
-            <Button variant="outline" @click="resolveApprovalConflict(false)">Cancelar</Button>
-            <Button class="bg-warning text-white hover:bg-warning/90" @click="resolveApprovalConflict(true)">Aprovar mesmo assim</Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <router-view v-slot="{ Component }">
+          <component :is="Component" @navigate="navigate" @view-map="handleViewOnMap" />
+        </router-view>
+      </main>
     </div>
-  </v-app>
+
+    <AlertDialog :open="confirmLogout" @update:open="confirmLogout = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sair do GeoMídia?</AlertDialogTitle>
+          <AlertDialogDescription>Sua sessão será encerrada neste navegador.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="confirmLogout = false">Cancelar</Button>
+          <Button variant="destructive" @click="logout">Sair</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="approvalConflictDialog" @update:open="(open) => { if (!open) resolveApprovalConflict(false); }">
+      <AlertDialogContent class="sm:max-w-xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Conflito territorial identificado</AlertDialogTitle>
+          <AlertDialogDescription class="text-foreground">{{ approvalConflict?.message }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul v-if="approvalConflict?.conflicts.length" class="divide-y rounded-md border">
+          <li
+            v-for="conflict in approvalConflict.conflicts"
+            :key="conflict.conflicting_asset_id"
+            class="flex items-start gap-3 px-4 py-3"
+          >
+            <TriangleAlert class="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+            <div>
+              <p class="tabular font-semibold">{{ conflict.process_code }}</p>
+              <p class="tabular text-sm text-muted-foreground">
+                {{ Math.round(conflict.distance_meters) }} m de distância; mínimo {{ conflict.minimum_distance_meters }} m
+              </p>
+            </div>
+          </li>
+        </ul>
+        <p class="text-sm text-muted-foreground">
+          Você pode aprovar mesmo assim. A decisão e os conflitos encontrados ficam registrados no histórico do processo.
+        </p>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="resolveApprovalConflict(false)">Cancelar</Button>
+          <Button class="bg-warning text-white hover:bg-warning/90" @click="resolveApprovalConflict(true)">Aprovar mesmo assim</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </div>
 </template>
 
 <script setup lang="ts">

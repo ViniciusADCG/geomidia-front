@@ -2,7 +2,7 @@
   <main class="grid min-h-dvh bg-card lg:grid-cols-[minmax(0,1.1fr)_minmax(28rem,0.9fr)]">
     <section
       class="relative flex min-h-56 flex-col justify-between overflow-hidden bg-brand-night bg-cover bg-center p-6 text-white sm:p-10 lg:min-h-dvh lg:p-14"
-      style="background-image: url('/login-hero-city.png')"
+      style="background-image: url('/login-hero-city.jpg')"
     >
       <div class="absolute inset-0 bg-gradient-to-t from-brand-night via-brand-night/40 to-transparent" aria-hidden="true" />
       <BrandLockup tone="onDark" :height="40" class="relative" />
