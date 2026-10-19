@@ -1,6 +1,6 @@
 <template>
   <nav class="flex h-full flex-col bg-sidebar text-sidebar-foreground" aria-label="Navegação principal">
-    <div class="border-b border-sidebar-border px-5 py-5" data-welcome-target>
+    <div class="border-b border-sidebar-border px-5 py-5">
       <GeoMidiaLockup tone="onDark" subtitle="Campo Grande, MS" />
     </div>
 
@@ -48,27 +48,15 @@
 </template>
 
 <script setup lang="ts">
-import {
-  CalendarClock,
-  FileWarning,
-  Inbox,
-  LayoutDashboard,
-  LogOut,
-  Map,
-  SlidersHorizontal,
-  TableProperties,
-  UsersRound,
-} from '@lucide/vue';
-import type { Component } from 'vue';
+import { LogOut } from '@lucide/vue';
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
+import { navGroups } from '@/components/layout/nav-items';
 import { cn } from '@/lib/utils';
 
-interface NavItem { title: string; name: string; to: string; icon: Component }
-interface NavGroup { label?: string; items: NavItem[] }
-
+// Menu do celular, aberto na gaveta lateral. No computador a navegação fica nas abas (AppTopNav).
 const props = defineProps<{
   activeName: string | symbol | null | undefined;
   canWrite: boolean;
@@ -77,32 +65,5 @@ const props = defineProps<{
 
 const emit = defineEmits<{ navigate: []; logout: [] }>();
 
-const groups = computed<NavGroup[]>(() => [
-  {
-    items: [
-      { title: 'Dashboard', name: 'dashboard', to: '/', icon: LayoutDashboard },
-      { title: 'Mapa GIS', name: 'map', to: '/mapa', icon: Map },
-      { title: 'Inventário', name: 'inventory', to: '/inventario', icon: TableProperties },
-      { title: 'Vencimentos', name: 'expirations', to: '/vencimentos', icon: CalendarClock },
-    ],
-  },
-  ...(props.canWrite
-    ? [{
-      label: 'Processos',
-      items: [
-        { title: 'Solicitações recebidas', name: 'forms', to: '/formularios', icon: Inbox },
-        { title: 'Comunicados de exigência', name: 'requirements', to: '/comunicados-de-exigencia', icon: FileWarning },
-      ],
-    }]
-    : []),
-  ...(props.isAdmin
-    ? [{
-      label: 'Administração',
-      items: [
-        { title: 'Usuários', name: 'users', to: '/usuarios', icon: UsersRound },
-        { title: 'Regras de negócio', name: 'rules', to: '/regras', icon: SlidersHorizontal },
-      ],
-    }]
-    : []),
-]);
+const groups = computed(() => navGroups(props.canWrite, props.isAdmin));
 </script>

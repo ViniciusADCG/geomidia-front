@@ -21,7 +21,8 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 4. **Telas grandes divididas em componentes.** O Inventário virou lista + `AssetFormDialog` + `RadiusReassessmentDialog`, e o Mapa ganhou `AssetDetails`.
 5. **Logo do GeoMídia**: a logo antiga em PNG foi redesenhada em vetor e virou também o `public/favicon.svg`.
 6. **Login novo**: cartão central sobre um fundo animado em canvas.
-7. **Boas-vindas depois do login**: saudação por horário com animação do símbolo.
+7. **Entrada no painel ("Pino pousa")**: depois do login o fundo animado continua, o cartão se achata numa linha amarela, o símbolo se monta com a saudação do horário e voa até o logo da faixa.
+8. **Faixa institucional com abas**: no computador, faixa azul de ponta a ponta (logo, marcas oficiais, usuário) e abas logo abaixo; Processos e Administração em menus suspensos. O Sair fica no menu do usuário. No celular continua o menu na gaveta lateral.
 
 ## Decisões fechadas com o usuário
 
@@ -34,7 +35,8 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 | Nome | "Geo" azul-escuro + "Mídia" azul-claro, formatação "Hierarquia" (nome maior, legenda menor com traço amarelo) | `src/components/brand/GeoMidiaLockup.vue` |
 | Layout do login | Cartão sobre fundo animado | `src/views/LoginView.vue` |
 | Fundo do login | Avenidas e quadras; cada carro que passa faz surgir uma placa com o raio mínimo e um anel ("Destaque na passagem") | `src/components/login/login-background-scenes.ts` |
-| Boas-vindas | "Símbolo se montando" + Bom dia (5h–12h) / Boa tarde (12h–18h) / Boa noite | `src/components/welcome/WelcomeOverlay.vue`, `src/lib/greeting.ts` |
+| Boas-vindas | "Pino pousa": cartão vira linha amarela, símbolo se monta com Bom dia (5h–12h) / Boa tarde (12h–18h) / Boa noite e voa ao logo da faixa | `src/components/welcome/WelcomeOverlay.vue`, `src/composables/useWelcome.ts`, `src/lib/greeting.ts` |
+| Casca do painel | "Faixa institucional" + "Abas com menus" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppTopNav.vue`, `nav-items.ts` |
 
 Todas as animações respeitam `prefers-reduced-motion`. A de boas-vindas pode ser pulada com clique ou Esc.
 
@@ -44,7 +46,7 @@ Todas as animações respeitam `prefers-reduced-motion`. A de boas-vindas pode s
 src/components/
   ui/            shadcn-vue (button, input, select, dialog, alert-dialog, table, sheet...)
   brand/         BrandLockup (SEMADES + PREFCG), GeoMidiaMark/Lockup, geomidia-marks.ts (SVG do símbolo)
-  layout/        AppSidebar, AppTopbar, PageHeader
+  layout/        AppTopbar (faixa), AppTopNav (abas), AppSidebar (gaveta do celular), nav-items, PageHeader
   common/        StatusBadge, ToneBadge, EmptyState, SearchInput, TablePager
   form/          FormField, FormSection, AttachmentLinksEditor
   inventory/     AssetFormDialog, RadiusReassessmentDialog

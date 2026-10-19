@@ -1,39 +1,47 @@
 <template>
   <router-view v-if="route.meta.public" />
 
-  <div v-else class="min-h-dvh bg-background text-foreground">
-    <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64" data-app-sidebar>
-      <app-sidebar
-        :active-name="route.name"
-        :can-write="auth.canWrite"
-        :is-admin="auth.role === 'admin'"
-        @logout="confirmLogout = true"
-      />
-    </aside>
+  <div v-else class="min-h-dvh bg-background text-foreground" :style="{ '--shell-top': isDesktop ? 'calc(7rem + 3px)' : '4rem' }">
+    <!-- No computador: faixa institucional (logo, marcas oficiais e usuário) e, abaixo dela, as abas. -->
+    <div v-if="isDesktop" class="sticky top-0 z-40">
+      <app-topbar dark class="lg:pl-5" v-bind="topbarProps" @refresh="refreshCurrentView" @logout="confirmLogout = true">
+        <template #start>
+          <div class="w-56" data-welcome-target><GeoMidiaLockup tone="onDark" subtitle="Campo Grande, MS" /></div>
+        </template>
+        <template #end><BrandLockup tone="onDark" :height="28" class="mr-2" /></template>
+      </app-topbar>
+      <span class="block h-[3px] bg-brand-yellow" aria-hidden="true" />
+      <div class="flex h-12 border-b bg-card px-4 lg:px-5" data-welcome-nav>
+        <app-top-nav :active-name="route.name" :can-write="auth.canWrite" :is-admin="auth.role === 'admin'" />
+      </div>
+    </div>
 
-    <Sheet v-else v-model:open="drawer">
-      <SheetContent side="left" class="w-72 gap-0 border-0 bg-sidebar p-0 sm:max-w-72">
-        <SheetTitle class="sr-only">Menu</SheetTitle>
-        <app-sidebar
-          :active-name="route.name"
-          :can-write="auth.canWrite"
-          :is-admin="auth.role === 'admin'"
-          @navigate="drawer = false"
-          @logout="drawer = false; confirmLogout = true"
-        />
-      </SheetContent>
-    </Sheet>
+    <!-- No celular: barra com o botão de menu e o menu na gaveta lateral. -->
+    <template v-else>
+      <Sheet v-model:open="drawer">
+        <SheetContent side="left" class="w-72 gap-0 border-0 bg-sidebar p-0 sm:max-w-72">
+          <SheetTitle class="sr-only">Menu</SheetTitle>
+          <app-sidebar
+            :active-name="route.name"
+            :can-write="auth.canWrite"
+            :is-admin="auth.role === 'admin'"
+            @navigate="drawer = false"
+            @logout="drawer = false; confirmLogout = true"
+          />
+        </SheetContent>
+      </Sheet>
 
-    <div :class="isDesktop ? 'pl-64' : ''">
       <app-topbar
-        :show-menu="!isDesktop"
-        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading)"
-        :role-label="roleLabel"
-        :user-name="auth.userName"
+        class="sticky top-0 z-30"
+        show-menu
+        v-bind="topbarProps"
         @toggle-menu="drawer = !drawer"
         @refresh="refreshCurrentView"
+        @logout="confirmLogout = true"
       />
+    </template>
 
+    <div>
       <main class="mx-auto w-full max-w-[1760px] px-4 py-6 lg:px-8 lg:py-8">
         <Alert v-if="auth.error || media.error" variant="destructive" class="mb-6 pr-12">
           <CircleAlert />
@@ -108,8 +116,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { CircleAlert, TriangleAlert, X } from '@lucide/vue';
 import { useMediaQuery } from '@vueuse/core';
 
+import BrandLockup from '@/components/brand/BrandLockup.vue';
+import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppTopbar from '@/components/layout/AppTopbar.vue';
+import AppTopNav from '@/components/layout/AppTopNav.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -136,6 +147,7 @@ const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
 const isDesktop = useMediaQuery('(min-width: 1024px)');
+
 const drawer = ref(false);
 const confirmLogout = ref(false);
 const approvalConflictDialog = ref(false);
@@ -149,6 +161,11 @@ if (isVisualPreview()) {
 }
 
 const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista GeoMídia', viewer: 'Consulta' }[auth.role ?? 'viewer']));
+const topbarProps = computed(() => ({
+  loading: media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading),
+  roleLabel: roleLabel.value,
+  userName: auth.userName,
+}));
 
 onMounted(() => {
   window.addEventListener('geomidia:unauthorized', handleUnauthorized);

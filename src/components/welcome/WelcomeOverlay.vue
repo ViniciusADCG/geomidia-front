@@ -29,7 +29,8 @@ import { welcomeMessage } from '@/lib/greeting';
 import { useAuthStore } from '@/stores/auth';
 
 // Boas-vindas depois do login, sobre o mesmo fundo animado: as camadas do símbolo surgem, o pino
-// cai do alto com a saudação do horário e, no fim, o menu entra pela esquerda e recebe o símbolo.
+// cai do alto com a saudação do horário e, no fim, voa até o logo da faixa enquanto as abas entram
+// pela esquerda.
 // Clique ou Esc pulam.
 const welcome = useWelcome();
 const auth = useAuthStore();
@@ -46,7 +47,7 @@ const symbolSvg = geomidiaSymbolSvg('onDark');
 
 const GREETING_MS = 2300;
 const LANDING_MS = 850;
-const ROOT_CLASSES = ['welcome-hide-mark', 'welcome-sidebar-in'];
+const ROOT_CLASSES = ['welcome-hide-mark', 'welcome-nav-in'];
 
 let timers: number[] = [];
 
@@ -66,7 +67,7 @@ function onKey(event: KeyboardEvent) {
   if (event.key === 'Escape') finish();
 }
 
-// O lugar do símbolo no painel, marcado com data-welcome-target. No celular o menu fica fechado e não há alvo.
+// O lugar do símbolo no painel: o logo da faixa, marcado com data-welcome-target. No celular não há alvo.
 function landingTarget(): HTMLElement | null {
   const target = document.querySelector<HTMLElement>('[data-welcome-target] > div > span');
   const rect = target?.getBoundingClientRect();
@@ -80,7 +81,7 @@ function land() {
   const ease = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
   text.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' });
-  document.documentElement.classList.add('welcome-sidebar-in');
+  document.documentElement.classList.add('welcome-nav-in');
 
   if (element && target) {
     const from = element.getBoundingClientRect();
@@ -171,13 +172,13 @@ html.welcome-hide-mark [data-welcome-target] > div > span:first-child {
   visibility: hidden;
 }
 
-/* O menu lateral entra pela esquerda para receber o símbolo. */
-html.welcome-sidebar-in [data-app-sidebar] {
-  animation: welcome-sidebar-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+/* As abas abaixo da faixa entram pela esquerda enquanto o símbolo pousa. */
+html.welcome-nav-in [data-welcome-nav] > nav {
+  animation: welcome-nav-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-@keyframes welcome-sidebar-in {
-  from { transform: translateX(-100%); }
-  to { transform: none; }
+@keyframes welcome-nav-in {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: none; }
 }
 </style>

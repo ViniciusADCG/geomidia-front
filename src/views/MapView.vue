@@ -1,5 +1,5 @@
 <template>
-  <section class="flex flex-col lg:h-[calc(100dvh-8rem)]">
+  <section class="flex flex-col lg:h-[calc(100dvh-var(--shell-top,4rem)-4rem)]">
     <PageHeader title="Mapa GIS">
       <template #description>
         <span v-if="mapState.loading">Atualizando mapa...</span>

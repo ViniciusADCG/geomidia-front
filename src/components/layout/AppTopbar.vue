@@ -1,5 +1,11 @@
 <template>
-  <header class="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card px-4 lg:px-8">
+  <header
+    :class="cn(
+      'flex h-16 items-center gap-3 px-4 lg:px-8',
+      dark ? 'bg-sidebar text-white' : 'bg-card',
+      !dark && 'border-b',
+    )"
+  >
     <Button
       v-if="showMenu"
       variant="ghost"
@@ -11,52 +17,88 @@
       <Menu class="size-5" />
     </Button>
 
-    <BrandLockup :height="showMenu ? 26 : 32" />
+    <!-- O começo da barra muda com a disposição: marcas oficiais, título da página ou navegação. -->
+    <slot name="start">
+      <BrandLockup :height="showMenu ? 26 : 32" />
+    </slot>
 
     <div class="ml-auto flex items-center gap-2 sm:gap-4">
+      <slot name="end" />
+
       <Button
         variant="ghost"
         size="icon"
         title="Atualizar dados"
         aria-label="Atualizar dados"
+        :class="dark && 'text-white hover:bg-white/10 hover:text-white'"
         :disabled="loading"
         @click="emit('refresh')"
       >
         <RefreshCw :class="cn('size-[18px]', loading && 'animate-spin')" />
       </Button>
 
-      <div class="flex min-w-0 items-center gap-3">
-        <span
-          class="grid size-9 shrink-0 place-items-center rounded-full bg-brand-navy text-sm font-semibold text-white"
-          aria-hidden="true"
-        >{{ initials }}</span>
-        <div class="hidden min-w-0 leading-tight sm:block">
-          <p class="max-w-44 truncate text-sm font-semibold" :title="userName ?? ''">{{ userName }}</p>
-          <p class="text-xs text-muted-foreground">{{ roleLabel }}</p>
-        </div>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button
+            type="button"
+            :class="cn(
+              'flex min-w-0 items-center gap-3 rounded-md py-1 pr-2 pl-1 text-left outline-none transition-colors',
+              dark ? 'hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-brand-yellow' : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring',
+            )"
+            :aria-label="`Conta de ${userName ?? 'usuário'}`"
+          >
+            <span
+              :class="cn(
+                'grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold',
+                dark ? 'bg-brand-yellow text-brand-night' : 'bg-brand-navy text-white',
+              )"
+              aria-hidden="true"
+            >{{ initials }}</span>
+            <span class="hidden min-w-0 leading-tight sm:block">
+              <span class="block max-w-44 truncate text-sm font-semibold">{{ userName }}</span>
+              <span :class="cn('block text-xs', dark ? 'text-sidebar-muted' : 'text-muted-foreground')">{{ roleLabel }}</span>
+            </span>
+            <ChevronDown :class="cn('hidden size-4 sm:block', dark ? 'text-sidebar-muted' : 'text-muted-foreground')" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-56">
+          <DropdownMenuItem class="gap-2.5 py-2 text-base" @select="emit('logout')">
+            <LogOut class="size-4" aria-hidden="true" />
+            Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { Menu, RefreshCw } from '@lucide/vue';
+import { ChevronDown, LogOut, Menu, RefreshCw } from '@lucide/vue';
 import { computed } from 'vue';
 
 import BrandLockup from '@/components/brand/BrandLockup.vue';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-const props = defineProps<{
-  showMenu: boolean;
+const props = withDefaults(defineProps<{
+  showMenu?: boolean;
   loading: boolean;
   roleLabel: string;
   userName: string | null;
-}>();
+  // Barra no azul da marca, com texto branco.
+  dark?: boolean;
+}>(), { showMenu: false, dark: false });
 
 const emit = defineEmits<{
   'toggle-menu': [];
   refresh: [];
+  logout: [];
 }>();
 
 const initials = computed(() => {
