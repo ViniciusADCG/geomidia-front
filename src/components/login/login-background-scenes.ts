@@ -31,125 +31,95 @@ function diamond(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw: numb
   ctx.closePath();
 }
 
-// Malha de ruas em perspectiva com rastros de luz percorrendo as vias.
-// Um gerador com opções, para testar variações do mesmo fundo.
+// Malha de ruas em perspectiva (mesmas proporções das camadas do símbolo).
 const TILE_W = 120;
 const TILE_H = 58;
 const SLOPE = TILE_H / TILE_W;
 
-interface AvenidasOptions {
+// Avenidas e quadras: poucos carros; ao passar por uma rua, um carro faz surgir uma placa
+// com o raio mínimo na quadra ao lado, que fica alguns segundos e some.
+interface PassagemOptions {
   cars: number;
   speed: [number, number];
   length: [number, number];
-  gridAlpha: number;
-  yellowEvery: number;
+  spawnChance: number;
+  life: number;
+  burst: boolean;
   glow: boolean;
-  blocks: boolean;
-  panels?: PanelStyle;
+  rise: boolean;
 }
 
-export type PanelStyle = 'placa' | 'outdoor' | 'led' | 'isometrico' | 'raio';
+const easeOut = (p: number) => 1 - (1 - Math.min(1, Math.max(0, p))) ** 3;
 
-// Desenha um painel de mídia exterior com a base no ponto (x, y). "light" vai de 0 a 1.
-function drawPanel(ctx: CanvasRenderingContext2D, style: PanelStyle, x: number, y: number, light: number, t: number, seed: number) {
-  const lit = (alpha: number) => `rgba(${YELLOW}, ${alpha})`;
-  switch (style) {
-    case 'placa':
-      ctx.fillStyle = lit(0.25 + light * 0.6);
-      ctx.fillRect(x - 5, y - 13, 10, 6);
-      ctx.fillRect(x - 0.75, y - 7, 1.5, 7);
-      return;
-    case 'outdoor':
-      ctx.fillStyle = lit(0.1 * light);
-      ctx.fillRect(x - 16, y - 25, 32, 18);
-      ctx.fillStyle = 'rgba(200, 210, 255, 0.55)';
-      ctx.fillRect(x - 8, y - 9, 1.5, 9);
-      ctx.fillRect(x + 6.5, y - 9, 1.5, 9);
-      ctx.fillStyle = lit(0.3 + light * 0.6);
-      ctx.fillRect(x - 12, y - 21, 24, 11);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x - 12.5, y - 21.5, 25, 12);
-      return;
-    case 'led': {
-      const colors = [CYAN, YELLOW, '255, 255, 255'];
-      const cycle = t / 2.5 + seed * 3;
-      const current = colors[Math.floor(cycle) % 3];
-      const fade = Math.min(1, (cycle % 1) * 4);
-      ctx.fillStyle = 'rgba(200, 210, 255, 0.5)';
-      ctx.fillRect(x - 0.75, y - 8, 1.5, 8);
-      ctx.fillStyle = 'rgba(10, 14, 50, 0.9)';
-      ctx.fillRect(x - 10, y - 21, 20, 13);
-      ctx.fillStyle = `rgba(${current}, ${0.35 + fade * 0.55})`;
-      ctx.fillRect(x - 9, y - 20, 18, 11);
-      ctx.fillStyle = 'rgba(10, 14, 50, 0.35)';
-      for (let line = 0; line < 3; line += 1) ctx.fillRect(x - 9, y - 18 + line * 3.5, 18, 1);
-      return;
-    }
-    case 'isometrico': {
-      const half = 13;
-      const rise = half * SLOPE;
-      ctx.fillStyle = 'rgba(200, 210, 255, 0.55)';
-      ctx.fillRect(x - 0.75, y - 6, 1.5, 6);
-      ctx.beginPath();
-      ctx.moveTo(x - half, y - 6 + rise);
-      ctx.lineTo(x + half, y - 6 - rise);
-      ctx.lineTo(x + half, y - 18 - rise);
-      ctx.lineTo(x - half, y - 18 + rise);
-      ctx.closePath();
-      ctx.fillStyle = lit(0.3 + light * 0.6);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      return;
-    }
-    case 'raio': {
-      const ring = (t * 0.35 + seed) % 1;
-      ctx.beginPath();
-      ctx.ellipse(x, y, 40, 40 * SLOPE, 0, 0, Math.PI * 2);
-      ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = lit(0.3);
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.ellipse(x, y, 40 * ring, 40 * ring * SLOPE, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = lit(0.5 * (1 - ring));
-      ctx.stroke();
-      ctx.fillStyle = lit(0.35 + light * 0.55);
-      ctx.fillRect(x - 5, y - 13, 10, 6);
-      ctx.fillRect(x - 0.75, y - 7, 1.5, 7);
-      return;
-    }
+function drawRaioPlaca(ctx: CanvasRenderingContext2D, x: number, y: number, age: number, life: number, t: number, seed: number, o: PassagemOptions) {
+  const appear = easeOut(age / 0.7);
+  const fade = Math.min(1, (life - age) / 1.2);
+  const alpha = Math.max(0, Math.min(appear, fade));
+  if (alpha <= 0) return;
+  const lit = (a: number) => `rgba(${YELLOW}, ${a * alpha})`;
+  const radius = 42 * (o.rise ? easeOut(age / 1.6) : appear);
+
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.ellipse(x, y, radius, radius * SLOPE, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = lit(0.4);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (o.burst && age < 1.4) {
+    const p = age / 1.4;
+    const r = 42 + 60 * easeOut(p);
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * SLOPE, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${YELLOW}, ${(1 - p) * 0.7})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
   }
+
+  const ring = (t * 0.35 + seed) % 1;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 42 * ring, 42 * ring * SLOPE, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = lit(0.45 * (1 - ring));
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const height = o.rise ? easeOut(age / 0.9) : 1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1.35, 1.35 * height);
+  ctx.fillStyle = lit(0.9);
+  ctx.fillRect(-5, -13, 10, 6);
+  ctx.fillRect(-0.75, -7, 1.5, 7);
+  ctx.restore();
 }
 
-function createAvenidas(options: AvenidasOptions): Scene {
+function createPassagem(o: PassagemOptions): Scene {
   return (ctx, w, h, t) => {
     paintBase(ctx, w, h);
     const span = h + w * SLOPE;
     const first = -Math.ceil((w * SLOPE) / TILE_H);
     const last = Math.ceil(span / TILE_H);
-    // Interseção entre a rua "descendo" k e a rua "subindo" m (podem ser meias posições).
     const cross = (k: number, m: number) => {
       const x = (m * TILE_H + w * SLOPE - k * TILE_H) / (2 * SLOPE);
       return { x, y: k * TILE_H + x * SLOPE };
     };
+    // Centro da quadra onde fica um ponto da tela.
+    const blockAt = (x: number, y: number) => cross(
+      Math.floor((y - x * SLOPE) / TILE_H) + 0.5,
+      Math.floor((y + x * SLOPE - w * SLOPE) / TILE_H) + 0.5,
+    );
 
-    if (options.blocks) {
-      ctx.fillStyle = 'rgba(120, 150, 255, 0.09)';
-      for (let k = first; k <= last; k += 1) {
-        for (let m = first; m <= last; m += 1) {
-          const { x, y } = cross(k + 0.5, m + 0.5);
-          if (x < -TILE_W || x > w + TILE_W || y < -TILE_H || y > h + TILE_H) continue;
-          diamond(ctx, x, y, TILE_W * 0.4, TILE_H * 0.4);
-          ctx.fill();
-        }
+    ctx.fillStyle = 'rgba(120, 150, 255, 0.09)';
+    for (let k = first; k <= last; k += 1) {
+      for (let m = first; m <= last; m += 1) {
+        const { x, y } = cross(k + 0.5, m + 0.5);
+        if (x < -TILE_W || x > w + TILE_W || y < -TILE_H || y > h + TILE_H) continue;
+        diamond(ctx, x, y, TILE_W * 0.4, TILE_H * 0.4);
+        ctx.fill();
       }
     }
-
-    ctx.strokeStyle = `rgba(140, 165, 255, ${options.gridAlpha})`;
+    ctx.strokeStyle = 'rgba(140, 165, 255, 0.12)';
     ctx.lineWidth = 1;
     for (let k = first; k <= last; k += 1) {
       const b = k * TILE_H;
@@ -157,57 +127,58 @@ function createAvenidas(options: AvenidasOptions): Scene {
       ctx.beginPath(); ctx.moveTo(0, b + w * SLOPE); ctx.lineTo(w, b); ctx.stroke();
     }
 
-    if (options.panels) {
-      // Painéis sobre algumas quadras, escolhidas de forma fixa para não piscarem de lugar.
-      for (let k = first; k <= last; k += 1) {
-        for (let m = first; m <= last; m += 1) {
-          const seed = rand(k * 71.3 + m * 19.7);
-          if (seed < 0.8) continue;
-          const { x, y } = cross(k + 0.5, m + 0.5);
-          if (x < 10 || x > w - 10 || y < 20 || y > h) continue;
-          const light = Math.max(0, Math.sin(t * 0.9 + seed * 40));
-          ctx.save();
-          ctx.translate(x, y + 4);
-          ctx.scale(1.35, 1.35);
-          drawPanel(ctx, options.panels, 0, 0, light, t, seed);
-          ctx.restore();
-        }
+    // Só ruas que cruzam a faixa central da tela, para os carros ficarem visíveis por mais tempo.
+    const laneMin = Math.ceil((h * 0.12 - (w * SLOPE) / 2) / TILE_H);
+    const laneMax = Math.floor((h * 0.88 - (w * SLOPE) / 2) / TILE_H);
+    const cars: Array<{ x: number; y: number; dy: number; length: number }> = [];
+    for (let i = 0; i < o.cars; i += 1) {
+      const down = i % 2 === 0;
+      const speed = o.speed[0] + rand(i * 9.1) * (o.speed[1] - o.speed[0]);
+      const length = o.length[0] + rand(i * 2.3) * (o.length[1] - o.length[0]);
+      const travel = w + length * 2;
+      const period = travel / speed;
+      const distance = rand(i * 5.3) * travel + t * speed;
+      const generation = Math.floor(distance / travel);
+      // Rua e ponto de surgimento mudam a cada passagem do carro.
+      const pathOf = (gen: number) => {
+        const lane = laneMin + Math.floor(rand(i * 3.7 + gen * 1.31) * (laneMax - laneMin + 1));
+        const b = lane * TILE_H;
+        return (px: number) => ({ x: px, y: down ? b + px * SLOPE : b + w * SLOPE - px * SLOPE });
+      };
+
+      const x = (distance % travel) - length;
+      const head = pathOf(generation)(x);
+      cars.push({ x, y: head.y, dy: down ? length * SLOPE : -length * SLOPE, length });
+
+      for (const gen of [generation, generation - 1]) {
+        if (rand(i * 7.7 + gen * 3.3) > o.spawnChance) continue;
+        const at = 0.2 + rand(i * 1.9 + gen * 5.1) * 0.6;
+        const spawnTime = (gen * travel - rand(i * 5.3) * travel) / speed + at * period;
+        const age = t - spawnTime;
+        if (age < 0 || age > o.life) continue;
+        const point = pathOf(gen)(at * travel - length);
+        const block = blockAt(point.x, point.y + (down ? -6 : 6));
+        if (block.x < 20 || block.x > w - 20 || block.y < 30 || block.y > h - 10) continue;
+        drawRaioPlaca(ctx, block.x, block.y + 4, age, o.life, t, rand(i + gen), o);
       }
     }
 
-    const lanes = last - first + 2;
-    if (options.glow) ctx.globalCompositeOperation = 'lighter';
+    if (o.glow) ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
-    for (let i = 0; i < options.cars; i += 1) {
-      const down = i % 2 === 0;
-      const lane = first + Math.floor(rand(i * 3.7) * lanes);
-      const speed = options.speed[0] + rand(i * 9.1) * (options.speed[1] - options.speed[0]);
-      const length = options.length[0] + rand(i * 2.3) * (options.length[1] - options.length[0]);
-      const travel = w + length * 2;
-      const x = ((rand(i * 5.3) * travel + t * speed) % travel) - length;
-      const b = lane * TILE_H;
-      const y = down ? b + x * SLOPE : b + w * SLOPE - x * SLOPE;
-      const dy = down ? length * SLOPE : -length * SLOPE;
-      const color = i % options.yellowEvery === 0 ? YELLOW : CYAN;
-      const trail = ctx.createLinearGradient(x - length, y - dy, x, y);
-      trail.addColorStop(0, `rgba(${color}, 0)`);
-      trail.addColorStop(1, `rgba(${color}, 0.85)`);
+    for (const car of cars) {
+      const trail = ctx.createLinearGradient(car.x - car.length, car.y - car.dy, car.x, car.y);
+      trail.addColorStop(0, `rgba(${CYAN}, 0)`);
+      trail.addColorStop(1, `rgba(${CYAN}, 0.85)`);
       ctx.strokeStyle = trail;
-      ctx.lineWidth = options.glow ? 3 : 2;
-      ctx.beginPath(); ctx.moveTo(x - length, y - dy); ctx.lineTo(x, y); ctx.stroke();
+      ctx.lineWidth = o.glow ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(car.x - car.length, car.y - car.dy); ctx.lineTo(car.x, car.y); ctx.stroke();
     }
     ctx.globalCompositeOperation = 'source-over';
   };
 }
 
-const BASE: AvenidasOptions = {
-  cars: 46, speed: [50, 120], length: [40, 100], gridAlpha: 0.12, yellowEvery: 7, glow: false, blocks: true,
-};
-
 export const SCENES: Record<string, Scene> = {
-  placa: createAvenidas({ ...BASE, panels: 'placa' }),
-  outdoor: createAvenidas({ ...BASE, panels: 'outdoor' }),
-  led: createAvenidas({ ...BASE, panels: 'led' }),
-  isometrico: createAvenidas({ ...BASE, panels: 'isometrico' }),
-  raio: createAvenidas({ ...BASE, panels: 'raio' }),
+  discreta: createPassagem({ cars: 8, speed: [60, 110], length: [50, 100], spawnChance: 0.5, life: 6, burst: false, glow: false, rise: false }),
+  destaque: createPassagem({ cars: 6, speed: [60, 100], length: [50, 100], spawnChance: 1, life: 6, burst: true, glow: false, rise: false }),
+  calma: createPassagem({ cars: 5, speed: [30, 50], length: [120, 190], spawnChance: 1, life: 10, burst: false, glow: true, rise: true }),
 };
