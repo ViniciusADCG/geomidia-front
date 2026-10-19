@@ -1,6 +1,6 @@
 <template>
   <nav class="flex h-full flex-col bg-sidebar text-sidebar-foreground" aria-label="Navegação principal">
-    <div class="border-b border-sidebar-border px-5 py-5">
+    <div class="border-b border-sidebar-border px-5 py-5" data-welcome-target>
       <GeoMidiaLockup tone="onDark" subtitle="Campo Grande, MS" />
     </div>
 

@@ -2,7 +2,7 @@
   <router-view v-if="route.meta.public" />
 
   <div v-else class="min-h-dvh bg-background text-foreground">
-    <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64">
+    <aside v-if="isDesktop" class="fixed inset-y-0 left-0 z-40 w-64" data-app-sidebar>
       <app-sidebar
         :active-name="route.name"
         :can-write="auth.canWrite"

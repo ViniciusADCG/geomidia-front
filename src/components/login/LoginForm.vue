@@ -135,6 +135,7 @@ async function submit() {
   errorMessage.value = '';
   try {
     await auth.login(username.value.trim(), password.value, remember.value);
+    await welcome.leave();
     welcome.play();
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
     await router.replace(redirect);

@@ -4,6 +4,11 @@
   </div>
 </template>
 
+<script lang="ts">
+// Relógio comum a todas as instâncias: o fundo das boas-vindas continua a cena do login sem pular.
+const CLOCK_START = performance.now();
+</script>
+
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -44,9 +49,8 @@ function start() {
   resize();
   if (reduceMotion) return;
 
-  const startedAt = performance.now();
   const tick = (now: number) => {
-    scene(ctx, width, height, (now - startedAt) / 1000 + 4);
+    scene(ctx, width, height, (now - CLOCK_START) / 1000 + 4);
     frame = requestAnimationFrame(tick);
   };
   frame = requestAnimationFrame(tick);

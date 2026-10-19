@@ -1,12 +1,31 @@
 import { ref } from 'vue';
 
-// Liga a animação de boas-vindas (WelcomeOverlay). O login chama play() ao entrar.
-const active = ref(false);
+// Transição do login para o painel ("Pino pousa"): o cartão se achata numa linha amarela, o símbolo
+// se monta sobre o mesmo fundo animado com a saudação e voa até o menu lateral, que entra pela
+// esquerda. O login chama leave() e depois play().
+
+// leaving: o cartão do login está saindo; greeting: saudação sobre o fundo; landing: símbolo indo ao menu.
+export type WelcomePhase = 'idle' | 'leaving' | 'greeting' | 'landing';
+
+// Quanto tempo o cartão leva para sair da tela.
+export const LEAVE_MS = 650;
+
+const phase = ref<WelcomePhase>('idle');
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 export function useWelcome() {
   return {
-    active,
-    play: () => { active.value = true; },
-    finish: () => { active.value = false; },
+    phase,
+    // Tira o cartão do login e resolve quando ele já saiu da tela.
+    leave: () => new Promise<void>((resolve) => {
+      phase.value = 'leaving';
+      window.setTimeout(resolve, prefersReducedMotion() ? 0 : LEAVE_MS);
+    }),
+    play: () => { phase.value = 'greeting'; },
+    land: () => { phase.value = 'landing'; },
+    finish: () => { phase.value = 'idle'; },
   };
 }
