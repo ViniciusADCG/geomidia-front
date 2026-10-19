@@ -1,18 +1,18 @@
 import { ref, watch } from 'vue';
 
-// Forma de escrever "GeoMídia" ao lado do símbolo, em avaliação.
+// Formatação do nome "GeoMídia" (em duas cores) ao lado do símbolo, em avaliação.
 // A troca só existe em desenvolvimento; em produção vale a primeira da lista.
 export const WORDMARK_VARIANTS = [
-  { id: 'duas-cores', name: 'Duas cores', idea: '"Geo" no azul-escuro e "Mídia" no azul-claro, como na logo original.' },
-  { id: 'peso', name: 'Peso misto', idea: '"Geo" em negrito e "Mídia" em peso normal, numa cor só.' },
-  { id: 'descritor', name: 'Com descritor', idea: 'O nome com a linha "Gestão de mídia exterior", que diz o que o sistema faz.' },
-  { id: 'empilhado', name: 'Empilhado', idea: '"Geo" sobre "Mídia", em duas linhas compactas ao lado do símbolo.' },
-  { id: 'placa', name: 'Na placa', idea: 'O nome dentro de uma placa inclinada com contorno amarelo, como a placa PREFCG.' },
+  { id: 'base', name: 'Base', idea: 'Como está hoje: negrito, letras levemente juntas.' },
+  { id: 'forte', name: 'Extra forte', idea: 'Peso maior, um pouco maior e mais junto. Ganha presença de marca.' },
+  { id: 'suave', name: 'Suave', idea: 'Peso médio e espaçamento normal. Mais leve, combina com o texto da interface.' },
+  { id: 'ciano', name: 'Ciano do pino', idea: '"Mídia" no mesmo ciano do miolo do pino, ligando o nome ao símbolo.' },
+  { id: 'hierarquia', name: 'Hierarquia', idea: 'Nome maior e legenda menor, com o traço amarelo inclinado antes da legenda.' },
 ] as const;
 
 export type WordmarkVariantId = typeof WORDMARK_VARIANTS[number]['id'];
 
-const STORAGE_KEY = 'geomidia_wordmark_variant';
+const STORAGE_KEY = 'geomidia_wordmark_format';
 const DEFAULT: WordmarkVariantId = WORDMARK_VARIANTS[0].id;
 
 function readStored(): WordmarkVariantId {

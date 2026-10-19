@@ -5,7 +5,7 @@
     aria-label="Testar nome do GeoMídia"
   >
     <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-semibold">Testar nome</p>
+      <p class="text-sm font-semibold">Testar formatação do nome</p>
       <button
         type="button"
         class="rounded-sm text-sm text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
