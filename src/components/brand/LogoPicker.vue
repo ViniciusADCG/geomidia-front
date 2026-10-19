@@ -42,7 +42,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { MARK_TONES } from '@/components/brand/geomidia-marks';
 import { useLogoVariant } from '@/composables/useLogoVariant';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +50,6 @@ const collapsed = ref(false);
 
 const options = computed(() => [
   { id: currentId, name: 'Atual', svg: null },
-  ...variants.map((item, index) => ({ id: item.id, name: `${index + 1}. ${item.name}`, svg: item.svg(MARK_TONES.onLight) })),
+  ...variants.map((item, index) => ({ id: item.id, name: `${index + 1}. ${item.name}`, svg: item.svg('onLight') })),
 ]);
 </script>

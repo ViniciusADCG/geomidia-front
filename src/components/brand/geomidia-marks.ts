@@ -1,81 +1,145 @@
-// Propostas de símbolo do GeoMídia, em avaliação. Cada uma é um SVG 64x64 que recebe as cores
-// por parâmetro para funcionar sobre fundo claro e sobre o azul do menu.
-// fg = forma principal, knock = recortes (cor do fundo), accent = amarelo PREFCG.
+// Variações da logo atual do GeoMídia (selo com pino sobre camadas de mapa), redesenhadas em vetor.
+// Todas mantêm a mesma composição; mudam acabamento, paleta e presença do selo e do nome.
 
-export interface MarkColors {
-  fg: string;
-  knock: string;
-  accent: string;
-}
+export type MarkTone = 'onLight' | 'onDark';
 
 export interface MarkVariant {
   id: string;
   name: string;
   idea: string;
-  svg: (c: MarkColors) => string;
+  svg: (tone?: MarkTone) => string;
 }
 
-export const MARK_TONES: Record<'onLight' | 'onDark', MarkColors> = {
-  onLight: { fg: '#283587', knock: '#ffffff', accent: '#ffcc00' },
-  onDark: { fg: '#ffffff', knock: '#1b2463', accent: '#ffcc00' },
+interface Palette {
+  ring: [string, string];
+  pin: string;
+  pinCenter: string;
+  top: [string, string];
+  middle: [string, string];
+  bottom: [string, string];
+  geo: string;
+  midia: string;
+}
+
+const ORIGINAL: Palette = {
+  ring: ['#2a7be0', '#0e3a8c'],
+  pin: '#123a86',
+  pinCenter: '#2fb1f0',
+  top: ['#8fd8fb', '#45b4f2'],
+  middle: ['#2f86e6', '#1a63c9'],
+  bottom: ['#163f8f', '#0d2b66'],
+  geo: '#123a86',
+  midia: '#1b8ae6',
 };
 
-const wrap = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">${body}</svg>`;
+const PREFEITURA: Palette = {
+  ring: ['#283587', '#283587'],
+  pin: '#283587',
+  pinCenter: '#ffcc00',
+  top: ['#c3cbf3', '#9ba7e6'],
+  middle: ['#4f5fc0', '#3a4aa8'],
+  bottom: ['#1b2463', '#1b2463'],
+  geo: '#283587',
+  midia: '#4f5fc0',
+};
+
+// Versão sobre o azul do menu, para a variação sem selo branco.
+const ON_DARK: Palette = {
+  ...ORIGINAL,
+  pin: '#ffffff',
+  bottom: ['#5b7fd6', '#3f63bd'],
+};
+
+interface Options {
+  palette: Palette;
+  gradient: boolean;
+  badge: boolean;
+  wordmark: boolean;
+}
+
+let uidCounter = 0;
+
+function build({ palette, gradient, badge, wordmark }: Options, tone: MarkTone): string {
+  const p = !badge && tone === 'onDark' ? ON_DARK : palette;
+  const uid = `gm${(uidCounter += 1)}`;
+  const fill = (name: string, [a, b]: [string, string]) => (gradient && a !== b ? `url(#${uid}-${name})` : a);
+  const grad = (name: string, [a, b]: [string, string]) => (
+    gradient && a !== b
+      ? `<linearGradient id="${uid}-${name}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`
+      : ''
+  );
+  // Cor dos recortes do pino: o branco do selo, ou o fundo quando não há selo.
+  const knock = badge || tone === 'onLight' ? '#ffffff' : '#1b2463';
+
+  const layer = (dy: number, color: string) => (
+    `<path d="M50 ${38.5 + dy} 74 ${50 + dy} 50 ${61.5 + dy} 26 ${50 + dy}Z" fill="${color}" stroke="${color}" stroke-width="3.5" stroke-linejoin="round"/>`
+  );
+
+  const symbol = `
+    ${layer(9, fill('bottom', p.bottom))}
+    ${layer(4.5, fill('middle', p.middle))}
+    ${layer(0, fill('top', p.top))}
+    <g clip-path="url(#${uid}-clip)" stroke="#ffffff" stroke-linecap="round" fill="none" opacity=".92">
+      <path d="M24 52.5C33 50 39 46 50 46.5s17 4.5 26 2" stroke-width="2"/>
+      <path d="M33 43.5 57 55" stroke-width="1.2"/>
+      <path d="M45 40.5 66 50.5" stroke-width="1.2"/>
+    </g>
+    <path d="M50 50 39.76 33.25A12 12 0 1 1 60.24 33.25Z" fill="${p.pin}" stroke="${knock}" stroke-width="2.5" stroke-linejoin="round" paint-order="stroke"/>
+    <circle cx="50" cy="27" r="6.2" fill="${knock}"/>
+    <circle cx="50" cy="27" r="3.6" fill="${p.pinCenter}"/>`;
+
+  const defs = `<defs>
+    ${grad('ring', p.ring)}${grad('top', p.top)}${grad('middle', p.middle)}${grad('bottom', p.bottom)}
+    <clipPath id="${uid}-clip"><path d="M50 38.5 74 50 50 61.5 26 50Z"/></clipPath>
+  </defs>`;
+
+  let body: string;
+  if (badge) {
+    const ring = `<circle cx="50" cy="50" r="46" fill="#ffffff" stroke="${fill('ring', p.ring)}" stroke-width="5"/>`;
+    body = wordmark
+      ? `${ring}<g transform="translate(50 39.5) scale(.9) translate(-50 -42.5)">${symbol}</g>
+         <text x="50" y="81" text-anchor="middle" textLength="50" lengthAdjust="spacingAndGlyphs" font-family="Onest Variable, Onest, ui-sans-serif, system-ui, sans-serif" font-size="13.5" font-weight="700"><tspan fill="${p.geo}">Geo</tspan><tspan fill="${p.midia}">Mídia</tspan></text>`
+      : `${ring}<g transform="translate(50 52) scale(1.22) translate(-50 -42.5)">${symbol}</g>`;
+  } else {
+    body = `<g transform="translate(50 50) scale(1.55) translate(-50 -42.5)">${symbol}</g>`;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${defs}${body}</svg>`;
+}
 
 export const MARK_VARIANTS: MarkVariant[] = [
   {
-    id: 'raio',
-    name: 'Pino com raio',
-    idea: 'O pino do mapa carrega, dentro dele, o círculo do raio mínimo que o sistema calcula para cada veículo.',
-    svg: (c) => wrap(`
-      <path d="M32 3C18.7 3 8 13.5 8 26.6 8 44 32 61 32 61s24-17 24-34.4C56 13.5 45.3 3 32 3Z" fill="${c.fg}"/>
-      <circle cx="32" cy="26" r="14" fill="${c.knock}"/>
-      <circle cx="32" cy="26" r="9" stroke="${c.fg}" stroke-width="2" stroke-dasharray="3.2 2.6"/>
-      <circle cx="32" cy="26" r="4" fill="${c.accent}"/>`),
+    id: 'degrade',
+    name: 'Degradê refinado',
+    idea: 'A mais próxima da atual: mesmo selo, degradês e nome, redesenhados em vetor com camadas alinhadas e ruas limpas.',
+    svg: (tone = 'onLight') => build({ palette: ORIGINAL, gradient: true, badge: true, wordmark: true }, tone),
   },
   {
-    id: 'placa',
-    name: 'Placa inclinada',
-    idea: 'Um outdoor visto de frente, com o painel na mesma inclinação da placa PREFCG e um ponto de localização.',
-    svg: (c) => wrap(`
-      <path d="M17 8h42l-6.5 30H10.5L17 8Z" fill="${c.fg}" stroke="${c.accent}" stroke-width="3" stroke-linejoin="round"/>
-      <path d="M33.5 15c-4.4 0-8 3.4-8 7.6 0 5.6 8 11.4 8 11.4s8-5.8 8-11.4c0-4.2-3.6-7.6-8-7.6Z" fill="${c.knock}"/>
-      <circle cx="33.5" cy="22.6" r="2.8" fill="${c.fg}"/>
-      <rect x="29" y="38" width="6" height="17" fill="${c.fg}"/>
-      <rect x="18" y="55" width="28" height="4" rx="2" fill="${c.fg}"/>`),
+    id: 'chapada',
+    name: 'Cores chapadas',
+    idea: 'O mesmo desenho sem degradês. Fica mais nítida em tamanho pequeno e em impressão.',
+    svg: (tone = 'onLight') => build({ palette: ORIGINAL, gradient: false, badge: true, wordmark: true }, tone),
   },
   {
-    id: 'monograma',
-    name: 'Monograma G',
-    idea: 'Um G geométrico dentro do bloco inclinado da marca da prefeitura; o ponto amarelo marca o local no mapa.',
-    svg: (c) => wrap(`
-      <path d="M14 6h46l-10 52H4L14 6Z" fill="${c.fg}"/>
-      <path d="M43 20.5a13 13 0 1 0 2.4 13.5H33.5" stroke="${c.knock}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(-1 0) skewX(-6)"/>
-      <circle cx="44.5" cy="17" r="4.5" fill="${c.accent}"/>`),
+    id: 'prefeitura',
+    name: 'Cores da prefeitura',
+    idea: 'O mesmo desenho com o azul e o amarelo do manual PREFCG; o miolo amarelo do pino conversa com a placa da prefeitura.',
+    svg: (tone = 'onLight') => build({ palette: PREFEITURA, gradient: false, badge: true, wordmark: true }, tone),
   },
   {
-    id: 'quadra',
-    name: 'Quadra no mapa',
-    idea: 'Um recorte da malha urbana: uma quadra ocupada por um veículo, cercada pelo raio que protege a vizinhança.',
-    svg: (c) => wrap(`
-      <rect x="4" y="4" width="56" height="56" rx="10" fill="${c.fg}"/>
-      <path d="M4 23h56M4 41h56M23 4v56M41 4v56" stroke="${c.knock}" stroke-width="3" opacity=".35"/>
-      <circle cx="32" cy="32" r="17" stroke="${c.accent}" stroke-width="2.5" stroke-dasharray="4 3"/>
-      <rect x="25.5" y="25.5" width="13" height="13" rx="1.5" fill="${c.knock}"/>`),
+    id: 'selo',
+    name: 'Selo sem texto',
+    idea: 'O selo com pino e camadas maiores, sem o nome dentro. Feito para o menu e o ícone da aba, onde o nome já aparece ao lado.',
+    svg: (tone = 'onLight') => build({ palette: ORIGINAL, gradient: true, badge: true, wordmark: false }, tone),
   },
   {
-    id: 'medida',
-    name: 'Medida do raio',
-    idea: 'O instrumento de medição: o centro do veículo, o limite do raio e a régua amarela entre os dois.',
-    svg: (c) => wrap(`
-      <circle cx="32" cy="32" r="28" fill="${c.fg}"/>
-      <circle cx="32" cy="32" r="19" stroke="${c.knock}" stroke-width="2.5" stroke-dasharray="3.5 3"/>
-      <path d="M32 32 45.5 18.5" stroke="${c.accent}" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="45.5" cy="18.5" r="4" fill="${c.accent}"/>
-      <circle cx="32" cy="32" r="5" fill="${c.knock}"/>`),
+    id: 'simbolo',
+    name: 'Só o símbolo',
+    idea: 'Pino e camadas sem o selo. Ocupa todo o espaço e se adapta ao fundo azul do menu.',
+    svg: (tone = 'onLight') => build({ palette: ORIGINAL, gradient: true, badge: false, wordmark: false }, tone),
   },
 ];
 
-export function markDataUrl(variant: MarkVariant, tone: keyof typeof MARK_TONES = 'onLight'): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(variant.svg(MARK_TONES[tone]).trim())}`;
+export function markDataUrl(variant: MarkVariant, tone: MarkTone = 'onLight'): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(variant.svg(tone).trim())}`;
 }

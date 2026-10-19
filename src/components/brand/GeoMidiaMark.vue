@@ -4,7 +4,7 @@
     :class="cn('inline-block shrink-0 [&>svg]:size-full', props.class)"
     :style="{ width: `${size}px`, height: `${size}px` }"
     aria-hidden="true"
-    v-html="variant.svg(MARK_TONES[tone])"
+    v-html="variant.svg(tone)"
   />
   <img
     v-else
@@ -19,7 +19,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
 
-import { MARK_TONES } from '@/components/brand/geomidia-marks';
 import { useLogoVariant } from '@/composables/useLogoVariant';
 import { cn } from '@/lib/utils';
 
