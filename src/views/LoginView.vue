@@ -18,10 +18,7 @@
 
     <section class="flex items-center justify-center px-6 py-10 sm:px-10">
       <div class="w-full max-w-sm">
-        <div class="flex items-center gap-3">
-          <GeoMidiaMark :size="44" />
-          <p class="text-xl font-semibold">GeoMídia</p>
-        </div>
+        <GeoMidiaLockup large />
 
         <h1 class="mt-8 text-2xl font-semibold tracking-tight">Entrar</h1>
         <p class="mt-1 text-muted-foreground">Use o usuário e a senha fornecidos pela administração do GeoMídia.</p>
@@ -102,7 +99,7 @@ import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import BrandLockup from '@/components/brand/BrandLockup.vue';
-import GeoMidiaMark from '@/components/brand/GeoMidiaMark.vue';
+import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
 import FormField from '@/components/form/FormField.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
