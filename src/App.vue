@@ -98,6 +98,8 @@
       </AlertDialogContent>
     </AlertDialog>
   </div>
+
+  <LogoPicker v-if="showLogoPicker" />
 </template>
 
 <script setup lang="ts">
@@ -106,6 +108,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { CircleAlert, TriangleAlert, X } from '@lucide/vue';
 import { useMediaQuery } from '@vueuse/core';
 
+import LogoPicker from '@/components/brand/LogoPicker.vue';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppTopbar from '@/components/layout/AppTopbar.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -133,6 +136,8 @@ const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
 const isDesktop = useMediaQuery('(min-width: 1024px)');
+// Seletor temporário para avaliar as propostas de logo; não aparece no build de produção.
+const showLogoPicker = import.meta.env.DEV;
 const drawer = ref(false);
 const confirmLogout = ref(false);
 const approvalConflictDialog = ref(false);

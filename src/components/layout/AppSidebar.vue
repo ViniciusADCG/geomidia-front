@@ -1,7 +1,7 @@
 <template>
   <nav class="flex h-full flex-col bg-sidebar text-sidebar-foreground" aria-label="Navegação principal">
     <div class="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
-      <img src="/Logocircular-arredondado.png" alt="" width="36" height="36" class="size-9 rounded-full" />
+      <GeoMidiaMark :size="36" tone="onDark" />
       <div class="leading-tight">
         <p class="text-lg font-semibold text-white">GeoMídia</p>
         <p class="text-xs text-sidebar-muted">Campo Grande, MS</p>
@@ -67,6 +67,7 @@ import type { Component } from 'vue';
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
+import GeoMidiaMark from '@/components/brand/GeoMidiaMark.vue';
 import { cn } from '@/lib/utils';
 
 interface NavItem { title: string; name: string; to: string; icon: Component }

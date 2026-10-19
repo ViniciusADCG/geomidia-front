@@ -19,7 +19,7 @@
     <section class="flex items-center justify-center px-6 py-10 sm:px-10">
       <div class="w-full max-w-sm">
         <div class="flex items-center gap-3">
-          <img src="/Logocircular-arredondado.png" alt="" width="44" height="44" class="size-11 rounded-full" />
+          <GeoMidiaMark :size="44" />
           <p class="text-xl font-semibold">GeoMídia</p>
         </div>
 
@@ -102,6 +102,7 @@ import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import BrandLockup from '@/components/brand/BrandLockup.vue';
+import GeoMidiaMark from '@/components/brand/GeoMidiaMark.vue';
 import FormField from '@/components/form/FormField.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
