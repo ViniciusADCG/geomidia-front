@@ -24,7 +24,7 @@
           <div
             v-for="step in pipeline"
             :key="step.label"
-            :class="step.bar"
+            :class="['motion-bar', step.bar]"
             :style="{ width: `${step.share}%` }"
           />
         </div>
@@ -34,7 +34,7 @@
               <span :class="['size-2 rounded-full', step.bar]" aria-hidden="true" />
               {{ step.label }}
             </p>
-            <p class="tabular mt-1 text-3xl font-semibold">{{ step.value }}</p>
+            <p class="tabular mt-1 text-3xl font-semibold"><CountUp :value="step.value" /></p>
             <p class="mt-0.5 text-sm text-muted-foreground">{{ step.caption }}</p>
           </li>
         </ol>
@@ -42,7 +42,7 @@
 
       <RouterLink
         to="/vencimentos"
-        class="group flex flex-col rounded-lg border bg-card p-5 outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+        class="group flex flex-col rounded-lg border bg-card p-5 outline-none transition-[border-color,box-shadow,translate] hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:translate-y-0"
         aria-labelledby="expiry-title"
       >
         <div class="flex items-center justify-between">
@@ -52,11 +52,11 @@
         <dl class="mt-4 grid flex-1 grid-cols-2 gap-4">
           <div :class="['rounded-md p-4', media.stats.expired ? 'bg-danger-soft' : 'bg-muted']">
             <dt class="text-sm text-muted-foreground">Vencidos</dt>
-            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expired && 'text-destructive']">{{ media.stats.expired }}</dd>
+            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expired && 'text-destructive']"><CountUp :value="media.stats.expired" /></dd>
           </div>
           <div :class="['rounded-md p-4', media.stats.expiring_soon ? 'bg-warning-soft' : 'bg-muted']">
             <dt class="text-sm text-muted-foreground">Vencem em 90 dias</dt>
-            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expiring_soon && 'text-warning']">{{ media.stats.expiring_soon }}</dd>
+            <dd :class="['tabular mt-1 text-3xl font-semibold', media.stats.expiring_soon && 'text-warning']"><CountUp :value="media.stats.expiring_soon" /></dd>
           </div>
         </dl>
       </RouterLink>
@@ -78,11 +78,11 @@
           <li v-for="item in chartData" :key="item.type">
             <div class="flex items-baseline justify-between gap-4 text-sm">
               <span class="truncate">{{ mediaTypeLabel(item.type) }}</span>
-              <span class="tabular font-semibold">{{ item.count }}</span>
+              <span class="tabular font-semibold"><CountUp :value="item.count" /></span>
             </div>
             <div class="mt-1.5 h-2 rounded-full bg-muted">
               <div
-                class="h-full rounded-full"
+                class="motion-bar h-full rounded-full"
                 :style="{ width: `${item.percent}%`, backgroundColor: mediaTypeColor(item.type) }"
               />
             </div>
@@ -122,6 +122,7 @@ import { ChevronRight, Download, FolderOpen, History, LoaderCircle, Plus } from 
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 
+import CountUp from '@/components/common/CountUp.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ToneBadge from '@/components/common/ToneBadge.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';

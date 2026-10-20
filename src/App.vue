@@ -56,8 +56,10 @@
           </button>
         </Alert>
 
-        <router-view v-slot="{ Component }">
-          <component :is="Component" @navigate="navigate" @view-map="handleViewOnMap" />
+        <router-view v-slot="{ Component, route: current }">
+          <Transition name="page" mode="out-in" :duration="{ leave: 120, enter: 480 }">
+            <component :is="Component" :key="current.path" @navigate="navigate" @view-map="handleViewOnMap" />
+          </Transition>
         </router-view>
       </main>
     </div>

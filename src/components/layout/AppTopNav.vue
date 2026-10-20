@@ -1,5 +1,5 @@
 <template>
-  <nav class="flex min-w-0 items-stretch gap-0.5 overflow-x-auto" aria-label="Navegação principal">
+  <nav ref="navElement" class="relative flex min-w-0 items-stretch gap-0.5 overflow-x-auto" aria-label="Navegação principal">
     <template v-for="group in groups" :key="group.label ?? 'main'">
       <template v-if="!group.label">
         <RouterLink
@@ -7,20 +7,19 @@
           :key="item.name"
           :to="item.to"
           :aria-current="activeName === item.name ? 'page' : undefined"
+          :data-active="activeName === item.name || undefined"
           :class="linkClass(activeName === item.name)"
         >
           <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
           {{ item.title }}
-          <span v-if="activeName === item.name" :class="UNDERLINE" aria-hidden="true" />
         </RouterLink>
       </template>
 
       <DropdownMenu v-else>
         <DropdownMenuTrigger as-child>
-          <button type="button" :class="linkClass(isActiveGroup(group))">
+          <button type="button" :data-active="isActiveGroup(group) || undefined" :class="linkClass(isActiveGroup(group))">
             {{ group.label }}
             <ChevronDown class="size-4 opacity-70" aria-hidden="true" />
-            <span v-if="isActiveGroup(group)" :class="UNDERLINE" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" class="w-64">
@@ -33,12 +32,24 @@
         </DropdownMenuContent>
       </DropdownMenu>
     </template>
+
+    <!-- Traço amarelo da aba atual: desliza de uma aba para a outra. -->
+    <span
+      v-show="indicator.width > 0"
+      :class="cn(
+        'brand-slant pointer-events-none absolute bottom-0 left-0 h-[3px] bg-brand-yellow',
+        indicator.animate && 'transition-[translate,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none',
+      )"
+      :style="{ width: `${indicator.width}px`, translate: `${indicator.left}px 0` }"
+      aria-hidden="true"
+    />
   </nav>
 </template>
 
 <script setup lang="ts">
 import { ChevronDown } from '@lucide/vue';
-import { computed } from 'vue';
+import { useResizeObserver } from '@vueuse/core';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { navGroups, type NavGroup } from '@/components/layout/nav-items';
@@ -51,20 +62,40 @@ import {
 import { cn } from '@/lib/utils';
 
 // Abas abaixo da faixa institucional: os itens principais à mostra e os grupos em menus suspensos.
-// A aba atual leva o traço amarelo inclinado.
+// A aba atual leva o traço amarelo inclinado, que desliza ao trocar de página.
 const props = defineProps<{
   activeName: string | symbol | null | undefined;
   canWrite: boolean;
   isAdmin: boolean;
 }>();
 
-const UNDERLINE = 'brand-slant absolute right-3 bottom-0 left-3 h-[3px] bg-brand-yellow';
+const navElement = ref<HTMLElement | null>(null);
+const indicator = reactive({ left: 0, width: 0, animate: false });
 
 const groups = computed(() => navGroups(props.canWrite, props.isAdmin));
 
 function isActiveGroup(group: NavGroup) {
   return group.items.some((item) => item.name === props.activeName);
 }
+
+// O traço fica 12px para dentro de cada lado da aba, como o sublinhado do título.
+function placeIndicator(animate: boolean) {
+  const active = navElement.value?.querySelector<HTMLElement>('[data-active]');
+  indicator.animate = animate;
+  if (!active) {
+    indicator.width = 0;
+    return;
+  }
+  indicator.left = active.offsetLeft + 12;
+  indicator.width = active.offsetWidth - 24;
+}
+
+onMounted(() => placeIndicator(false));
+watch(() => props.activeName, async () => {
+  await nextTick();
+  placeIndicator(true);
+});
+useResizeObserver(navElement, () => placeIndicator(false));
 
 function linkClass(active: boolean) {
   return cn(
