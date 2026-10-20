@@ -1,17 +1,17 @@
 # Handoff: refatoração visual do GeoMídia
 
-Branch: `feat/refatoracao-visual`, a partir da `main` (`5d13136`). Atualizado em 19/10/2026.
-Status: **pausada, tudo commitado, ainda não enviada ao GitHub** (sem push e sem PR).
+Branch: `feat/refatoracao-visual`, a partir da `main` (`5d13136`). Atualizado em 19/10/2026, à noite.
+Status: **pausada, 29 commits, tudo commitado, ainda não enviada ao GitHub** (sem push e sem PR).
 
 Este arquivo é o ponto de retomada. O plano original está em [`specs/2026-10-19-refatoracao-visual.md`](specs/2026-10-19-refatoracao-visual.md).
 
 ## Regra que guiou tudo
 
-Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram como estavam: `stores/`, `services/api.ts`, `types.ts`, `domain/`, `utils/`, rotas e permissões. Os testes antigos (101) passam em todas as etapas, e entraram 4 testes novos da saudação: **105 passando**.
+Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram como estavam: `stores/`, `services/api.ts`, `types.ts`, `domain/`, `utils/`, rotas e permissões. Os testes antigos (101) passam em todas as etapas, e entraram 6 testes novos (4 da saudação e 2 da despedida): **107 passando**.
 
 ## O que foi feito
 
-1. **Saída do Vuetify.** Agora o front usa Tailwind v4 + shadcn-vue (componentes copiados em `src/components/ui`, editáveis) com ícones `@lucide/vue`. Saíram o Vuetify, o `@mdi/font` e o `src/styles/main.css` (1.459 linhas, 53 `!important`). O JS principal caiu de 121 KB para 85 KB (gzip).
+1. **Saída do Vuetify.** Agora o front usa Tailwind v4 + shadcn-vue (componentes copiados em `src/components/ui`, editáveis) com ícones `@lucide/vue`. Saíram o Vuetify, o `@mdi/font` e o `src/styles/main.css` (1.459 linhas, 53 `!important`). O JS principal caiu de 121 KB para 85 KB (gzip) nessa etapa; com o menu suspenso, as abas e as animações está hoje em 109 KB.
 2. **Identidade PREFCG/SEMADES**, conforme o manual da marca:
    - azul `#283587` e amarelo `#FFCC00`;
    - fonte Onest (substituta aberta da Qanelas);
@@ -23,6 +23,8 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 6. **Login novo**: cartão central sobre um fundo animado em canvas.
 7. **Entrada no painel ("Pino pousa")**: depois do login o fundo animado continua, o cartão se achata numa linha amarela, o símbolo se monta com a saudação do horário e voa até o logo da faixa.
 8. **Faixa institucional com abas**: no computador, faixa azul de ponta a ponta (logo, marcas oficiais, usuário) e abas logo abaixo; Processos e Administração em menus suspensos. O Sair fica no menu do usuário. No celular continua o menu na gaveta lateral.
+9. **Saída do painel ("Cidade sai do logo")**: ao confirmar o Sair, a cidade do login se abre em círculo a partir do logo da faixa, aparece "Até logo, Nome" e o cartão do login volta saindo do desfoque.
+10. **Movimento**: troca de página "Suave", traço das abas deslizando, números que contam e barras que crescem no Dashboard, linhas de tabela em cascata e botões que afundam ao clicar.
 
 ## Decisões fechadas com o usuário
 
@@ -40,7 +42,9 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 | Movimento | Troca de página "Suave" (sai esmaecendo, blocos sobem um a um); traço das abas desliza; números contam e barras crescem no Dashboard; linhas de tabela em cascata; botões afundam ao clicar. Tudo parado com movimento reduzido | `src/styles/motion.css`, `src/components/common/CountUp.vue`, `AppTopNav.vue` |
 | Casca do painel | "Faixa institucional" + "Abas com menus" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppTopNav.vue`, `nav-items.ts` |
 
-Todas as animações respeitam `prefers-reduced-motion`. A de boas-vindas pode ser pulada com clique ou Esc.
+Todas as animações respeitam `prefers-reduced-motion`. A de boas-vindas pode ser pulada com clique ou Esc. A saída por sessão expirada não anima.
+
+Testadas e descartadas (estão nas páginas de acompanhamento): login dividido ao meio, com a foto azul da cidade ou com o mapa de CG; menu recolhível, navegação no topo, trilho de ícones, painéis flutuantes e menu que abre no hover.
 
 ## Mapa do código novo
 
@@ -49,18 +53,20 @@ src/components/
   ui/            shadcn-vue (button, input, select, dialog, alert-dialog, table, sheet...)
   brand/         BrandLockup (SEMADES + PREFCG), GeoMidiaMark/Lockup, geomidia-marks.ts (SVG do símbolo)
   layout/        AppTopbar (faixa), AppTopNav (abas), AppSidebar (gaveta do celular), nav-items, PageHeader
-  common/        StatusBadge, ToneBadge, EmptyState, SearchInput, TablePager
+  common/        StatusBadge, ToneBadge, EmptyState, SearchInput, TablePager, CountUp
   form/          FormField, FormSection, AttachmentLinksEditor
   inventory/     AssetFormDialog, RadiusReassessmentDialog
   map/           AssetDetails, DetailSection, DetailItem
   expirations/   ExpirationListCard
   login/         LoginForm, LoginBackground, login-background-scenes.ts
-  welcome/       WelcomeOverlay
-src/composables/useWelcome.ts   liga a animação de boas-vindas
-src/lib/greeting.ts             saudação por horário (com testes)
+  welcome/       WelcomeOverlay (entrada), FarewellOverlay (saída)
+src/composables/useWelcome.ts   liga a entrada; o login chama leave() e play()
+src/composables/useFarewell.ts  liga a saída; o App chama leave() e arrive()
+src/lib/greeting.ts             saudação por horário e despedida (com testes)
 src/lib/tones.ts                cores semânticas dos selos
 src/styles/tailwind.css         tokens da marca e base
 src/styles/map.css              estilos dos elementos criados pelo Leaflet
+src/styles/motion.css           troca de página e detalhes animados
 ```
 
 ## Como rodar de novo
@@ -89,13 +95,20 @@ O backend roda em Docker e o front com Vite. Nada disso entra no Git.
 ## Próximos passos sugeridos
 
 1. Revisar com o Vinicius e decidir o destino do PR (`dev` ou `main`).
-2. Testar em celular de verdade, em especial o mapa e o fundo animado do login (desempenho).
-3. Rodar o fluxo público real (formulário com anexos no Supabase), que não dá para testar localmente.
-4. Passar a nova identidade para o formulário público e para o PDF do comprovante, se fizer parte do escopo.
-5. Revisar acessibilidade com leitor de tela (diálogos e tabelas).
+2. Testar em celular de verdade, em especial o mapa, o fundo animado do login e as animações de entrada e saída (desempenho).
+3. Decidir se a faixa institucional também vai para o celular (hoje o celular usa barra branca com o menu na gaveta).
+4. Rodar o fluxo público real (formulário com anexos no Supabase), que não dá para testar localmente.
+5. Passar a nova identidade para o formulário público e para o PDF do comprovante, se fizer parte do escopo.
+6. Revisar acessibilidade com leitor de tela (diálogos e tabelas).
 
 ## Páginas de acompanhamento
 
 - Antes e depois tela por tela: https://claude.ai/artifact/WG4m9H3e6Ce2ii3nUiJR98
 - Logo (símbolo e nome): https://claude.ai/artifact/4v9amXjKMU4fFBg5yqKQ1v
 - Login e boas-vindas: https://claude.ai/artifact/Fdur363CwEoCxWhMuVAYX4
+- Login dividido (descartado): https://claude.ai/artifact/2MfMSJK5bxMHt8bfLrQs5y
+- Entrada no painel: https://claude.ai/artifact/NFSuGZ1PffETXZBdhDoweh
+- Menu e barra: https://claude.ai/artifact/TwwqZSPHJFo9JecxnoXnWv
+- Saída do painel: https://claude.ai/artifact/3Le9zmm9DmtK83uvP9H6Lj
+- Movimento do painel: https://claude.ai/artifact/6ZrAZVvqdV568KMd3TLSm8
+- **Resumo de tudo, desde o começo:** https://claude.ai/artifact/9nMo7JFiJEyhfxB3ZM8Hfd
