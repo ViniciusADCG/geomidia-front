@@ -786,7 +786,7 @@ type GroundProp =
 type SkyProp =
   | { kind: 'plane'; banner: Face; y: number; period: number; phase: number }
   | { kind: 'blimp'; banner: Face; y: number; period: number; phase: number }
-  | { kind: 'araras'; pair: [AraraKind, AraraKind]; y: number; period: number; phase: number };
+  | { kind: 'araras'; pairs: AraraKind[]; y: number; cross: number; gap: number; phase: number };
 
 interface CityConfig {
   seed: number;
@@ -1059,21 +1059,31 @@ function sceneCity(config: CityConfig): LoginScene {
       // Céu: avião, dirigível, araras.
       for (const prop of config.sky) {
         const span = w + 700 * u;
+        if (prop.kind === 'araras') {
+          // Uma dupla atravessa o céu; a próxima só aparece `gap` segundos depois de a anterior sumir.
+          if (day <= 0.25) continue;
+          const turn = prop.cross + prop.gap;
+          const c = (((t + prop.phase) % (turn * prop.pairs.length)) + turn * prop.pairs.length) % (turn * prop.pairs.length);
+          const local = c % turn;
+          if (local >= prop.cross) continue;
+          const kind = prop.pairs[Math.floor(c / turn)];
+          const x = w + 250 * u - (local / prop.cross) * span;
+          const y = h * prop.y;
+          ctx.globalAlpha = Math.min(1, day * 1.5);
+          // As duas lado a lado, da mesma cor, perto mas sem cruzar as asas.
+          for (let i = 0; i < 2; i += 1) {
+            const fx = x + i * 52 * u + Math.sin(t * 0.9 + i) * 3 * u;
+            const fy = y + i * 20 * u + Math.sin(t * 1.3 + i * 2) * 3 * u;
+            arara(ctx, fx, fy, u * 1.45, t, i * 2.3, kind);
+          }
+          ctx.globalAlpha = 1;
+          continue;
+        }
         const p = ((t + prop.phase) % prop.period) / prop.period;
         const x = w + 250 * u - p * span;
         const y = h * prop.y + Math.sin(t * 0.6 + prop.phase) * 6 * u;
         if (prop.kind === 'plane') plane(ctx, x, y, u, prop.banner, t, light);
-        else if (prop.kind === 'blimp') blimp(ctx, w - x, y, u, prop.banner, light, t);
-        else if (day > 0.25) {
-          ctx.globalAlpha = Math.min(1, day * 1.5);
-          // Dupla de araras, bem separadas para uma não cruzar a asa da outra.
-          prop.pair.forEach((kind, i) => {
-            const fx = x + i * 70 * u + Math.sin(t * 0.9 + i) * 4 * u;
-            const fy = y + i * 26 * u + Math.sin(t * 1.3 + i * 2) * 4 * u;
-            arara(ctx, fx, fy, u * 1.45, t, i * 2.3 + prop.phase, kind);
-          });
-          ctx.globalAlpha = 1;
-        }
+        else blimp(ctx, w - x, y, u, prop.banner, light, t);
       }
 
       // Primeiro plano.
@@ -1167,9 +1177,9 @@ const CIDADE_MORENA: CityConfig = {
     // O avião passa acima do cartão; os tempos fazem tudo aparecer logo que a tela abre.
     { kind: 'plane', banner: 'morena', y: 0.045, period: 34, phase: 31 },
     { kind: 'blimp', banner: 'geomidia', y: 0.26, period: 80, phase: 52 },
-    // Duas duplas de araras, uma de cada vez (meio período de distância).
-    { kind: 'araras', pair: ['azul', 'vermelha'], y: 0.17, period: 24, phase: 19 },
-    { kind: 'araras', pair: ['vermelha', 'azul'], y: 0.21, period: 24, phase: 7 },
+    // Duplas de araras: duas azuis, depois duas vermelhas; cada uma atravessa em 20 s e a seguinte
+    // vem 15 s depois. A primeira aparece logo que a tela abre.
+    { kind: 'araras', pairs: ['azul', 'vermelha'], y: 0.18, cross: 20, gap: 15, phase: 64 },
   ],
   bus: 'feira',
   cars: 10,
