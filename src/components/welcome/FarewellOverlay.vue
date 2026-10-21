@@ -21,7 +21,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import { geomidiaSymbolSvg } from '@/components/brand/geomidia-marks';
 import LoginBackground from '@/components/login/LoginBackground.vue';
-import { isNightAt, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { isNightAt, isPhoneScreen, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
 import { cn } from '@/lib/utils';
 import { useFarewell } from '@/composables/useFarewell';
 import { farewellMessage } from '@/lib/greeting';
@@ -92,7 +92,7 @@ watch(visible, async (shown) => {
     document.documentElement.classList.remove('welcome-hide-mark');
     return;
   }
-  darkScene.value = isNightAt(sceneHour(hourSetting.value));
+  darkScene.value = !isPhoneScreen() && isNightAt(sceneHour(hourSetting.value));
   document.documentElement.classList.add('welcome-hide-mark');
   await nextTick();
   play();

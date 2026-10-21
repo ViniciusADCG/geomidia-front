@@ -27,7 +27,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 import { geomidiaSymbolSvg } from '@/components/brand/geomidia-marks';
 import LoginBackground from '@/components/login/LoginBackground.vue';
-import { isNightAt, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { isNightAt, isPhoneScreen, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
 import { cn } from '@/lib/utils';
 import { useWelcome } from '@/composables/useWelcome';
 import { welcomeMessage } from '@/lib/greeting';
@@ -114,7 +114,7 @@ function land() {
 
 watch(() => welcome.phase.value, async (phase, previous) => {
   if (phase !== 'greeting' || previous === 'greeting') return;
-  darkScene.value = isNightAt(sceneHour(hourSetting.value));
+  darkScene.value = !isPhoneScreen() && isNightAt(sceneHour(hourSetting.value));
   timers.forEach((id) => window.clearTimeout(id));
   timers = [];
   now.value = new Date();

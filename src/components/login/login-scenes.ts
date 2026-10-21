@@ -1,6 +1,6 @@
 // Fundo animado do login ("Cidade Morena"): uma avenida de Campo Grande com mídia exterior (triface,
 // outdoor, front light, avião com faixa, dirigível), ipês e araras, que vira dia ou noite conforme o
-// horário. O que não se mexe é desenhado uma vez em camadas guardadas (de dia e de noite) e só misturado.
+// horário. No celular não roda: o login fica com a imagem clara. O que não se mexe é desenhado uma vez em camadas guardadas (de dia e de noite) e só misturado.
 
 import { ref, type Ref } from 'vue';
 
@@ -22,6 +22,11 @@ export const LOGIN_HOUR_OPTIONS = [
   { value: '21', label: '21h', hint: 'Noite: janelas acesas, faróis e mídias iluminadas.' },
   { value: 'ciclo', label: 'Ciclo', hint: 'Um dia inteiro em 30 segundos.' },
 ];
+
+// No celular o login fica parado, com o fundo claro em imagem: sem a cidade animada.
+export function isPhoneScreen() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+}
 
 // Horário do fundo: em desenvolvimento, o escolhido no painel de teste; no sistema publicado, sempre o
 // relógio de verdade.
@@ -781,7 +786,7 @@ type GroundProp =
 type SkyProp =
   | { kind: 'plane'; banner: Face; y: number; period: number; phase: number }
   | { kind: 'blimp'; banner: Face; y: number; period: number; phase: number }
-  | { kind: 'araras'; y: number; period: number; phase: number };
+  | { kind: 'araras'; pair: [AraraKind, AraraKind]; y: number; period: number; phase: number };
 
 interface CityConfig {
   seed: number;
@@ -790,7 +795,6 @@ interface CityConfig {
   sky: SkyProp[];
   bus?: Face;
   cars: number;
-  hills?: boolean;
 }
 
 interface Building { x: number; w: number; h: number; slot?: Slot }
@@ -801,7 +805,7 @@ const NIGHT_LAYERS = ['#20296a', '#19205c', '#11174c'];
 function sceneCity(config: CityConfig): LoginScene {
   let cache: {
     w: number; h: number; u: number; ground: number;
-    far: { day: HTMLCanvasElement; night: HTMLCanvasElement; width: number; speed: number }[];
+    far: { day: HTMLCanvasElement; night: HTMLCanvasElement; width: number }[];
     near: { day: HTMLCanvasElement; night: HTMLCanvasElement; buildings: Building[] };
     flicker: { x: number; y: number; phase: number }[];
     beacons: { x: number; y: number; phase: number }[];
@@ -811,9 +815,21 @@ function sceneCity(config: CityConfig): LoginScene {
     const rand = random(500 + index);
     return { x: rand(), y: rand() * 0.6, r: 0.5 + rand() * 1.2, phase: rand() * 6 };
   });
-  const traffic = Array.from({ length: config.cars }, (_, index) => {
+  // Trânsito: cada faixa anda numa velocidade só e os veículos ocupam vagas fixas, com folga entre
+  // eles; assim ninguém passa por dentro de ninguém. O ônibus ocupa a primeira vaga da faixa de cima.
+  const LANE_SPEED = [62, 88];
+  const perLane = Math.ceil(config.cars / 2);
+  const traffic = Array.from({ length: perLane * 2 }, (_, index) => {
     const rand = random(config.seed * 31 + index);
-    return { lane: index % 2, speed: 55 + rand() * 75, offset: rand(), color: CAR_COLORS[Math.floor(rand() * CAR_COLORS.length)], size: 0.9 + rand() * 0.35 };
+    const lane = index < perLane ? 0 : 1;
+    const slot = index % perLane;
+    return {
+      lane,
+      bus: lane === 0 && slot === 0 && Boolean(config.bus),
+      offset: (slot + rand() * 0.2) / perLane,
+      color: CAR_COLORS[Math.floor(rand() * CAR_COLORS.length)],
+      size: 0.9 + rand() * 0.3,
+    };
   });
 
   function paintBuilding(ctx: CanvasRenderingContext2D, b: Building, ground: number, color: string, night: boolean, rand: () => number, windows: boolean) {
@@ -845,10 +861,10 @@ function sceneCity(config: CityConfig): LoginScene {
     // Escala das peças pela menor das medidas: no celular, outdoors e carros ficam menores.
     const u = Math.max(0.55, Math.min(1.3, h / 900, w / 1000));
     const ground = h * 0.8;
-    // Camadas do fundo, que andam devagar: uma cópia de dia e uma de noite.
+    // Camadas do fundo: uma cópia de dia e uma de noite.
     const far = [
-      { min: h * 0.26, max: h * 0.5, gap: 6, speed: 3 },
-      { min: h * 0.16, max: h * 0.34, gap: 10, speed: 7 },
+      { min: h * 0.26, max: h * 0.5, gap: 6 },
+      { min: h * 0.16, max: h * 0.34, gap: 10 },
     ].map((spec, index) => {
       const rand = random(config.seed * 7 + index);
       const list: Building[] = [];
@@ -866,7 +882,7 @@ function sceneCity(config: CityConfig): LoginScene {
         paintBuilding(day.ctx, b, ground, DAY_LAYERS[index], false, dayRand, index > 0);
         paintBuilding(night.ctx, b, ground, NIGHT_LAYERS[index], true, nightRand, index > 0);
       }
-      return { day: day.canvas, night: night.canvas, width: x, speed: spec.speed };
+      return { day: day.canvas, night: night.canvas, width: x };
     });
 
     // Primeiro plano parado, com os prédios das mídias nos lugares combinados.
@@ -1030,25 +1046,12 @@ function sceneCity(config: CityConfig): LoginScene {
         ctx.globalAlpha = 1;
       }
 
-      // Morros ao fundo (Campo Grande).
-      if (config.hills) {
-        ctx.fillStyle = mix('#a9c8b8', '#1b2460', light.dk);
-        ctx.beginPath();
-        ctx.moveTo(0, ground);
-        for (let x = 0; x <= w; x += 20) ctx.lineTo(x, ground - h * (0.36 + 0.06 * Math.sin(x / 210) + 0.03 * Math.sin(x / 77)));
-        ctx.lineTo(w, ground);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Camadas do fundo: noite por baixo, dia por cima com a transparência da luz do dia.
+      // Camadas do fundo, paradas: noite por baixo, dia por cima com a transparência da luz do dia.
       for (const item of far) {
-        const shift = (t * item.speed) % item.width;
         for (const [src, alpha] of [[item.night, 1], [item.day, day]] as const) {
           if (alpha <= 0.01) continue;
           ctx.globalAlpha = alpha;
-          ctx.drawImage(src, -shift, 0, item.width, h);
-          ctx.drawImage(src, item.width - shift, 0, item.width, h);
+          ctx.drawImage(src, 0, 0, item.width, h);
         }
         ctx.globalAlpha = 1;
       }
@@ -1063,12 +1066,11 @@ function sceneCity(config: CityConfig): LoginScene {
         else if (prop.kind === 'blimp') blimp(ctx, w - x, y, u, prop.banner, light, t);
         else if (day > 0.25) {
           ctx.globalAlpha = Math.min(1, day * 1.5);
-          // Bando: azuis (arara-azul) e vermelhas (arara-vermelha), em formação solta.
-          const flock: AraraKind[] = ['azul', 'vermelha', 'azul', 'vermelha'];
-          flock.forEach((kind, i) => {
-            const fx = x + i * 38 * u + Math.sin(t * 0.9 + i) * 6 * u;
-            const fy = y + (i % 2) * 18 * u - i * 5 * u + Math.sin(t * 1.3 + i * 2) * 5 * u;
-            arara(ctx, fx, fy, u * 1.45, t, i * 1.9, kind);
+          // Dupla de araras, bem separadas para uma não cruzar a asa da outra.
+          prop.pair.forEach((kind, i) => {
+            const fx = x + i * 70 * u + Math.sin(t * 0.9 + i) * 4 * u;
+            const fy = y + i * 26 * u + Math.sin(t * 1.3 + i * 2) * 4 * u;
+            arara(ctx, fx, fy, u * 1.45, t, i * 2.3 + prop.phase, kind);
           });
           ctx.globalAlpha = 1;
         }
@@ -1135,14 +1137,11 @@ function sceneCity(config: CityConfig): LoginScene {
       ctx.lineTo(w, middle);
       ctx.stroke();
       ctx.setLineDash([]);
-      if (config.bus) {
-        const x = lap(t, 45, 0.3, w + 400 * u) - 200 * u;
-        bus(ctx, x, middle - 5 * u, u, 1, config.bus, light);
-      }
+      const span = w + 400 * u;
       for (const item of traffic) {
-        const span = w + 160;
-        const x = lap(t, item.speed, item.offset, span) - 80;
-        if (item.lane === 0) car(ctx, x, middle - 6 * u, 1.05 * item.size * u, item.color, 1, light);
+        const x = lap(t, LANE_SPEED[item.lane] * u, item.offset, span) - 200 * u;
+        if (item.bus && config.bus) bus(ctx, x, middle - 5 * u, u, 1, config.bus, light);
+        else if (item.lane === 0) car(ctx, x, middle - 6 * u, 1.05 * item.size * u, item.color, 1, light);
         else car(ctx, w - x, roadBottom - 8 * u, 1.2 * item.size * u, item.color, -1, light);
       }
     },
@@ -1168,10 +1167,11 @@ const CIDADE_MORENA: CityConfig = {
     // O avião passa acima do cartão; os tempos fazem tudo aparecer logo que a tela abre.
     { kind: 'plane', banner: 'morena', y: 0.045, period: 34, phase: 31 },
     { kind: 'blimp', banner: 'geomidia', y: 0.26, period: 80, phase: 52 },
-    { kind: 'araras', y: 0.2, period: 24, phase: 19 },
+    // Duas duplas de araras, uma de cada vez (meio período de distância).
+    { kind: 'araras', pair: ['azul', 'vermelha'], y: 0.17, period: 24, phase: 19 },
+    { kind: 'araras', pair: ['vermelha', 'azul'], y: 0.21, period: 24, phase: 7 },
   ],
   bus: 'feira',
-  hills: true,
   cars: 10,
 };
 

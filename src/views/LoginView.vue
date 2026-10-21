@@ -43,19 +43,22 @@ import VariantLab, { type VariantGroup } from '@/components/dev/VariantLab.vue';
 import BrandLockup from '@/components/brand/BrandLockup.vue';
 import GeoMidiaMark from '@/components/brand/GeoMidiaMark.vue';
 import LoginBackground from '@/components/login/LoginBackground.vue';
-import { isNightAt, LOGIN_HOUR_KEY, LOGIN_HOUR_OPTIONS, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { isNightAt, isPhoneScreen, LOGIN_HOUR_KEY, LOGIN_HOUR_OPTIONS, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
 import LoginForm from '@/components/login/LoginForm.vue';
 import { useFarewell } from '@/composables/useFarewell';
 import { useWelcome } from '@/composables/useWelcome';
 import { cn } from '@/lib/utils';
 
 // Painel para fixar o horário do fundo (só em desenvolvimento).
-const showLab = import.meta.env.DEV;
+// No celular o fundo é a imagem clara parada: sem painel e com o rodapé claro.
+const phone = isPhoneScreen();
+const showLab = import.meta.env.DEV && !phone;
 const LAB_GROUPS: VariantGroup[] = [{ key: LOGIN_HOUR_KEY, label: 'Horário', fallback: 'agora', options: LOGIN_HOUR_OPTIONS }];
 const hourSetting = useSceneHourSetting();
 // O rodapé acompanha o céu: placa clara de dia, escura à noite. Confere a cada segundo por causa do ciclo.
-const night = ref(isNightAt(sceneHour(hourSetting.value)));
-const toneTimer = window.setInterval(() => { night.value = isNightAt(sceneHour(hourSetting.value)); }, 1000);
+const isNight = () => !phone && isNightAt(sceneHour(hourSetting.value));
+const night = ref(isNight());
+const toneTimer = window.setInterval(() => { night.value = isNight(); }, 1000);
 onBeforeUnmount(() => window.clearInterval(toneTimer));
 const sceneTone = computed(() => (night.value ? 'dark' : 'light'));
 

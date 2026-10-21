@@ -1,6 +1,7 @@
 <template>
   <div class="login-background fixed inset-0 overflow-hidden" aria-hidden="true">
-    <canvas ref="canvas" class="absolute inset-0 size-full" />
+    <div v-if="phone" class="login-photo absolute inset-0" />
+    <canvas v-else ref="canvas" class="absolute inset-0 size-full" />
   </div>
 </template>
 
@@ -12,11 +13,14 @@ const CLOCK_START = performance.now();
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { createLoginScene, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { createLoginScene, isPhoneScreen, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
 
 // Fundo do login, das boas-vindas e da saída, preso à tela: a "Cidade Morena" de login-scenes.ts, de
 // dia ou de noite conforme o horário. Em desenvolvimento dá para fixar um horário no painel de teste.
+// No celular fica a imagem clara da versão anterior, parada.
 const hourSetting = useSceneHourSetting();
+// No celular: imagem clara parada, sem animação (decidido ao abrir a tela).
+const phone = isPhoneScreen();
 const canvas = ref<HTMLCanvasElement | null>(null);
 let frame = 0;
 let resizeObserver: ResizeObserver | null = null;
@@ -89,13 +93,17 @@ watch(hourSetting, () => {
 
 onMounted(() => {
   // O texto dos outdoors usa a Onest; espera a fonte para não desenhar com a de reserva.
-  void document.fonts.load('800 16px "Onest Variable"').finally(start);
+  if (!phone) void document.fonts.load('800 16px "Onest Variable"').finally(start);
 });
 onBeforeUnmount(stop);
 </script>
 
 <style scoped>
 /* Camada própria: o que se anima por cima não obriga a redesenhar o resto. */
+.login-photo {
+  background: url('/login/fundo.jpg') center / cover no-repeat;
+}
+
 .login-background {
   background: #edf5fa;
   will-change: transform;
