@@ -48,10 +48,10 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 | Fundo do login | "Cidade Morena" (aguardando aprovação): avenida animada, dia/noite pelo relógio; o mesmo fundo nas boas-vindas e na saída | `src/components/login/login-scenes.ts`, `LoginBackground.vue` |
 | Boas-vindas | "Pino pousa": cartão vira linha amarela, símbolo se monta com Bom dia (5h–12h) / Boa tarde (12h–18h) / Boa noite e voa ao logo da faixa | `src/components/welcome/WelcomeOverlay.vue`, `src/composables/useWelcome.ts`, `src/lib/greeting.ts` |
 | Saída | "Cidade sai do logo": a cidade do login se abre em círculo a partir do logo da faixa, "Até logo, Nome", e o cartão do login volta saindo do desfoque | `src/components/welcome/FarewellOverlay.vue`, `src/composables/useFarewell.ts` |
-| Movimento | Troca de página "Suave" (sai esmaecendo, blocos sobem um a um); traço das abas desliza; números contam e barras crescem no Dashboard; linhas de tabela em cascata; botões afundam ao clicar. Tudo parado com movimento reduzido | `src/styles/motion.css`, `src/components/common/CountUp.vue`, `AppTopNav.vue` |
+| Movimento | Troca de página "Suave" (sai esmaecendo, blocos sobem um a um); números contam e barras crescem no Dashboard; linhas de tabela em cascata; botões afundam ao clicar. Tudo parado com movimento reduzido | `src/styles/motion.css`, `src/components/common/CountUp.vue` |
 | Casca do painel | "Faixa institucional" no topo + menu lateral "Desliza" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppSideNav.vue`, `nav-items.ts` |
 | Usuário na faixa | Só as iniciais; nome e papel no menu | `src/components/layout/AppTopbar.vue` |
-| Listas e menus | "Trilho amarelo": painel desce em 550 ms e a linha amarela corre no topo; grupos da barra abrem no hover | `src/styles/motion.css`, `AppTopNav.vue` |
+| Listas e menus | "Trilho amarelo": painel desce em 550 ms e a linha amarela corre no topo | `src/styles/motion.css` |
 | Cadastro de veículo | "Índice ao lado": topo e botões fixos, índice que acompanha a rolagem, resumo | `src/components/inventory/AssetFormDialog.vue` |
 | Pop-ups | "Mola + trilho" sobre véu azul com desfoque | `src/styles/motion.css` |
 
