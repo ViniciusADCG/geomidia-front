@@ -20,12 +20,18 @@ const hourSetting = useSceneHourSetting();
 const canvas = ref<HTMLCanvasElement | null>(null);
 let frame = 0;
 let resizeObserver: ResizeObserver | null = null;
+let onBlur: (() => void) | null = null;
+let onFocus: (() => void) | null = null;
 
 function stop() {
   cancelAnimationFrame(frame);
   frame = 0;
   resizeObserver?.disconnect();
   resizeObserver = null;
+  if (onBlur) window.removeEventListener('blur', onBlur);
+  if (onFocus) window.removeEventListener('focus', onFocus);
+  onBlur = null;
+  onFocus = null;
 }
 
 function start() {
@@ -37,6 +43,7 @@ function start() {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let width = 0;
   let height = 0;
+  let paused = false;
   const paint = (now: number) => painter.draw(ctx, width, height, (now - CLOCK_START) / 1000 + 6, sceneHour(hourSetting.value));
   const resize = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -45,7 +52,9 @@ function start() {
     element.width = Math.round(width * ratio);
     element.height = Math.round(height * ratio);
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    // Parado (movimento reduzido ou janela sem foco), redesenha o quadro atual no novo tamanho.
     if (reduceMotion) paint(CLOCK_START);
+    else if (paused) paint(performance.now());
   };
   resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(element);
@@ -56,6 +65,21 @@ function start() {
     frame = requestAnimationFrame(tick);
   };
   frame = requestAnimationFrame(tick);
+
+  // Janela sem foco (outro programa ou outra janela na frente): a cena congela no último quadro e
+  // volta a andar quando a janela recebe o foco. Com a aba escondida, o navegador já pausa sozinho.
+  onBlur = () => {
+    paused = true;
+    cancelAnimationFrame(frame);
+    frame = 0;
+  };
+  onFocus = () => {
+    if (!paused) return;
+    paused = false;
+    frame = requestAnimationFrame(tick);
+  };
+  window.addEventListener('blur', onBlur);
+  window.addEventListener('focus', onFocus);
 }
 
 // Com movimento reduzido a cena fica parada; redesenha ao trocar o horário.

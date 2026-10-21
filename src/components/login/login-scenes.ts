@@ -842,7 +842,8 @@ function sceneCity(config: CityConfig): LoginScene {
   }
 
   function build(w: number, h: number) {
-    const u = Math.max(0.7, Math.min(1.3, h / 900));
+    // Escala das peças pela menor das medidas: no celular, outdoors e carros ficam menores.
+    const u = Math.max(0.55, Math.min(1.3, h / 900, w / 1000));
     const ground = h * 0.8;
     // Camadas do fundo, que andam devagar: uma cópia de dia e uma de noite.
     const far = [
@@ -870,7 +871,9 @@ function sceneCity(config: CityConfig): LoginScene {
 
     // Primeiro plano parado, com os prédios das mídias nos lugares combinados.
     const rand = random(config.seed * 13);
-    const fixed: Building[] = config.slots.map((slot) => ({ x: slot.x * w - (slot.w * u) / 2, w: slot.w * u, h: slot.h * u, slot }));
+    // Em tela estreita o front light do telhado encavalaria no outdoor da calçada: fica de fora.
+    const slots = w < 700 ? [] : config.slots;
+    const fixed: Building[] = slots.map((slot) => ({ x: slot.x * w - (slot.w * u) / 2, w: slot.w * u, h: slot.h * u, slot }));
     const buildings: Building[] = [...fixed];
     let x = -20;
     while (x < w + 20) {
