@@ -41,3 +41,67 @@
 @keyframes motion-rise {
   from { opacity: 0; transform: translateY(10px); }
 }
+
+/* Abertura de listas e menus suspensos ("Trilho amarelo"): o painel desliza de trás do campo e uma
+   linha amarela corre no topo da esquerda para a direita. Ao fechar, some rápido. Vale para todo
+   Select e DropdownMenu do sistema, inclusive os menus da barra. */
+:is([data-slot="select-content"], [data-slot="dropdown-menu-content"]) {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"] {
+    animation: menu-slide 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"][data-side="top"] {
+    animation-name: menu-slide-up;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"]::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: 2px;
+    background: var(--brand-yellow);
+    transform-origin: left;
+    animation: menu-rail 200ms cubic-bezier(0.2, 0.8, 0.2, 1) 30ms both;
+    pointer-events: none;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="closed"] {
+    animation: menu-out 100ms ease-in both;
+  }
+}
+
+/* Movimento reduzido: o painel abre e fecha na hora, só com o traço amarelo parado. */
+@media (prefers-reduced-motion: reduce) {
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"]) {
+    animation: none;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"]::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: var(--brand-yellow);
+  }
+}
+
+@keyframes menu-slide {
+  from { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes menu-slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes menu-rail {
+  from { transform: scaleX(0); }
+}
+
+@keyframes menu-out {
+  to { opacity: 0; }
+}

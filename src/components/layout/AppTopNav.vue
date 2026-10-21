@@ -15,14 +15,25 @@
         </RouterLink>
       </template>
 
-      <DropdownMenu v-else>
+      <DropdownMenu
+        v-else
+        :open="openGroup === group.label"
+        :modal="false"
+        @update:open="(open) => onOpenChange(group.label!, open)"
+      >
         <DropdownMenuTrigger as-child>
-          <button type="button" :data-active="isActiveGroup(group) || undefined" :class="linkClass(isActiveGroup(group))">
+          <button
+            type="button"
+            :data-active="isActiveGroup(group) || undefined"
+            :class="linkClass(isActiveGroup(group))"
+            @pointerenter="(event) => hoverIn(group.label!, event)"
+            @pointerleave="hoverOut"
+          >
             {{ group.label }}
             <ChevronDown class="size-4 opacity-70" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" class="w-64">
+        <DropdownMenuContent align="start" class="w-64" @pointerenter="cancelClose" @pointerleave="hoverOut">
           <DropdownMenuItem v-for="item in group.items" :key="item.name" as-child>
             <RouterLink :to="item.to" :aria-current="activeName === item.name ? 'page' : undefined" class="gap-2.5 py-2 text-base">
               <component :is="item.icon" class="size-4" aria-hidden="true" />
@@ -73,6 +84,36 @@ const navElement = ref<HTMLElement | null>(null);
 const indicator = reactive({ left: 0, width: 0, animate: false });
 
 const groups = computed(() => navGroups(props.canWrite, props.isAdmin));
+
+// Os grupos abrem ao passar o mouse, sem clicar. Um pequeno atraso ao sair deixa atravessar o vão
+// entre a aba e o menu. Clique e teclado continuam funcionando; no toque, só o clique abre.
+const openGroup = ref<string | null>(null);
+const hoveredTrigger = ref<string | null>(null);
+let closeTimer = 0;
+
+function cancelClose() {
+  window.clearTimeout(closeTimer);
+}
+
+function hoverIn(label: string, event: PointerEvent) {
+  if (event.pointerType !== 'mouse') return;
+  cancelClose();
+  hoveredTrigger.value = label;
+  openGroup.value = label;
+}
+
+function hoverOut(event: PointerEvent) {
+  if (event.pointerType !== 'mouse') return;
+  hoveredTrigger.value = null;
+  cancelClose();
+  closeTimer = window.setTimeout(() => { openGroup.value = null; }, 150);
+}
+
+// Um clique na aba com o menu já aberto pelo mouse não o fecha.
+function onOpenChange(label: string, open: boolean) {
+  if (open) openGroup.value = label;
+  else if (hoveredTrigger.value !== label && openGroup.value === label) openGroup.value = null;
+}
 
 function isActiveGroup(group: NavGroup) {
   return group.items.some((item) => item.name === props.activeName);
