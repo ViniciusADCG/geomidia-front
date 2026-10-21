@@ -39,29 +39,31 @@
 
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
+          <!-- Na barra só as iniciais; nome completo e papel ficam no topo do menu. -->
           <button
             type="button"
             :class="cn(
-              'flex min-w-0 items-center gap-3 rounded-md py-1 pr-2 pl-1 text-left outline-none transition-colors',
+              'flex items-center gap-1.5 rounded-full p-1 pr-1.5 outline-none transition-colors',
               dark ? 'hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-brand-yellow' : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring',
             )"
             :aria-label="`Conta de ${userName ?? 'usuário'}`"
           >
             <span
               :class="cn(
-                'grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold',
+                'grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold',
                 dark ? 'bg-brand-yellow text-brand-night' : 'bg-brand-navy text-white',
               )"
               aria-hidden="true"
             >{{ initials }}</span>
-            <span class="hidden min-w-0 leading-tight sm:block">
-              <span class="block max-w-44 truncate text-sm font-semibold">{{ userName }}</span>
-              <span :class="cn('block text-xs', dark ? 'text-sidebar-muted' : 'text-muted-foreground')">{{ roleLabel }}</span>
-            </span>
-            <ChevronDown :class="cn('hidden size-4 sm:block', dark ? 'text-sidebar-muted' : 'text-muted-foreground')" aria-hidden="true" />
+            <ChevronDown :class="cn('hidden size-3.5 sm:block', dark ? 'text-sidebar-muted' : 'text-muted-foreground')" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="w-56">
+        <DropdownMenuContent align="end" class="w-60">
+          <DropdownMenuLabel class="grid gap-0.5 py-2 font-normal">
+            <span class="truncate font-semibold">{{ userName }}</span>
+            <span class="text-xs text-muted-foreground">{{ roleLabel }}</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem class="gap-2.5 py-2 text-base" @select="emit('logout')">
             <LogOut class="size-4" aria-hidden="true" />
             Sair
@@ -82,6 +84,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
