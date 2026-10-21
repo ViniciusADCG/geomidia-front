@@ -21,6 +21,8 @@
 
     <div class="grid items-start gap-4 2xl:grid-cols-2">
       <ExpirationListCard
+        id="vencidos"
+        :class="['scroll-mt-40', highlight === 'vencidos' && 'section-flash']"
         title="Vencidos"
         subtitle="A data de vencimento já passou"
         :items="overview.expired"
@@ -29,6 +31,8 @@
         @view-map="viewOnMap"
       />
       <ExpirationListCard
+        id="proximos"
+        :class="['scroll-mt-40', highlight === 'proximos' && 'section-flash']"
         title="Próximos ao vencimento"
         subtitle="Vencem nos próximos 90 dias"
         :items="overview.expiring_soon"
@@ -42,8 +46,8 @@
 
 <script setup lang="ts">
 import { CircleAlert, RefreshCw } from '@lucide/vue';
-import { onMounted, onUnmounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import ExpirationListCard from '@/components/expirations/ExpirationListCard.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
@@ -63,6 +67,9 @@ const EMPTY_OVERVIEW: ExpirationOverview = {
 };
 
 const router = useRouter();
+const route = useRoute();
+// Vindo do Dashboard com #vencidos ou #proximos: a lista certa é trazida à vista e pisca de leve.
+const highlight = ref('');
 const media = useMediaStore();
 const overview = ref<ExpirationOverview>({ ...EMPTY_OVERVIEW });
 const loading = ref(false);
@@ -70,8 +77,17 @@ const error = ref('');
 
 onMounted(() => {
   window.addEventListener('geomidia:expirations-refresh', loadExpirations);
-  void loadExpirations();
+  void loadExpirations().then(focusFromHash);
 });
+
+async function focusFromHash() {
+  const id = route.hash.replace('#', '');
+  if (id !== 'vencidos' && id !== 'proximos') return;
+  await nextTick();
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  highlight.value = id;
+  window.setTimeout(() => { highlight.value = ''; }, 1600);
+}
 onUnmounted(() => window.removeEventListener('geomidia:expirations-refresh', loadExpirations));
 
 async function loadExpirations() {

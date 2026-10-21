@@ -21,6 +21,16 @@
     animation: motion-grow 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both;
   }
 
+  /* Lista que se abre a partir de um atalho: um contorno amarelo pisca de leve. */
+  .section-flash {
+    animation: section-flash 1.6s ease-out;
+  }
+
+  /* A rosca do Dashboard aparece esmaecendo. */
+  .motion-ring {
+    animation: motion-ring 700ms ease-out 150ms both;
+  }
+
   /* Troca de página ("Suave"): a página esmaece ao sair; ao entrar, os blocos sobem um a um. */
   .page-leave-active { transition: opacity 120ms ease-in; }
   .page-leave-to { opacity: 0; }
@@ -36,6 +46,15 @@
 
 @keyframes motion-grow {
   from { transform: scaleX(0); }
+}
+
+@keyframes section-flash {
+  0%, 60% { box-shadow: 0 0 0 3px var(--brand-yellow); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+@keyframes motion-ring {
+  from { opacity: 0; }
 }
 
 @keyframes motion-rise {
