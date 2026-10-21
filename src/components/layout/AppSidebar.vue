@@ -56,7 +56,7 @@ import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
 import { navGroups } from '@/components/layout/nav-items';
 import { cn } from '@/lib/utils';
 
-// Menu do celular, aberto na gaveta lateral. No computador a navegação fica nas abas (AppTopNav).
+// Menu do celular, aberto na gaveta lateral. No computador a navegação fica no menu lateral (AppSideNav).
 const props = defineProps<{
   activeName: string | symbol | null | undefined;
   canWrite: boolean;

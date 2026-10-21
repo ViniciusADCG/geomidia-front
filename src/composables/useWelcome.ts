@@ -1,8 +1,8 @@
 import { ref } from 'vue';
 
 // Transição do login para o painel ("Pino pousa"): o cartão se achata numa linha amarela, o símbolo
-// se monta sobre o mesmo fundo animado com a saudação e voa até o logo da faixa, enquanto as abas
-// entram pela esquerda. O login chama leave() e depois play().
+// se monta sobre o mesmo fundo animado com a saudação e voa até o logo da faixa, enquanto o menu
+// lateral entra pela esquerda. O login chama leave() e depois play().
 
 // leaving: o cartão do login está saindo; greeting: saudação sobre o fundo; landing: símbolo indo ao logo.
 export type WelcomePhase = 'idle' | 'leaving' | 'greeting' | 'landing';

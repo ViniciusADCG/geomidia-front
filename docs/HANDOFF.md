@@ -28,11 +28,12 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 11. **Refinos de 20/10**:
     - na faixa, o usuário aparece só com as iniciais; nome e papel ficam no topo do menu;
     - todas as listas e menus abrem com o "Trilho amarelo" (550 ms, linha amarela correndo no topo);
-    - Processos e Administração abrem ao passar o mouse;
+    - (os menus Processos/Administração das abas foram substituídos pelo menu lateral em 21/10);
     - o cadastro/edição de veículo ganhou topo e botões fixos, índice das partes ao lado e resumo com raio, status e campos em aberto;
     - todos os pop-ups (Dialog) abrem com "Mola + trilho" sobre um véu azul com desfoque. As confirmações (AlertDialog) seguem como antes.
 12. **Fundo "Cidade Morena" (20/10, aguardando aprovação)**: avenida de Campo Grande em canvas que vira dia ou noite pelo relógio (sol e lua grandes passando por cima do cartão, estrelas, janelas acesas, faróis, refletores). Mídias: triface no chão, outdoor com refletores e lona deslizando, front light no telhado, avião com faixa, dirigível, ônibus com propaganda. Propagandas da cidade: Cidade Morena, Feira Central (sobá), Bioparque Pantanal, Parque das Nações Indígenas (com capivara), Tempo de ipês, além de GeoMídia, PREFCG e SEMADES. Ipês balançando e duplas de araras-azuis e vermelhas voando de dia; prédios do fundo parados e carros em vagas fixas por faixa. As boas-vindas e a saída usam o mesmo fundo; à noite o texto fica branco. A animação pausa quando a janela perde o foco. **No celular (até 767 px) não há animação**: o login usa a imagem clara anterior (`public/login/fundo.jpg`), parada. Em desenvolvimento, um painel no canto fixa o horário (inclusive "Ciclo": um dia em 30 s, para apresentar).
 13. **Dashboard em blocos (21/10, pedido do dono do sistema)**: caixa azul com o total de ativos, a rosca do andamento (sem texto dentro) e a legenda com quantidade e %; ao lado, seis blocos coloridos. Os dois de vencimento têm "Ver lista" e abrem Vencimentos já na lista certa (`#vencidos` / `#proximos`), que pisca em amarelo. "Ativos por tipo de veículo" em cartões. A cor do tipo Pequeno Porte passou a `#8a5a00` (antes quase igual à do Eletrônico Modular). Componentes em `src/components/dashboard/`.
+14. **Menu na lateral (21/10, pedido do dono do sistema)**: no computador as abas saíram de baixo da faixa azul; a navegação é um trilho fino de ícones à esquerda (64 px) que, ao passar o mouse ou com o foco do teclado, abre por cima da página (184 px) com os nomes curtos e os grupos Processos e Administração, sem empurrar o conteúdo (`src/components/layout/AppSideNav.vue`). A faixa azul (logo, marcas, usuário) continua no topo. No celular segue a gaveta. `AppTopNav` foi removido.
 
 ## Decisões fechadas com o usuário
 
@@ -48,7 +49,7 @@ Só o frontend mudou. O backend, o contrato da API e a lógica do front ficaram 
 | Boas-vindas | "Pino pousa": cartão vira linha amarela, símbolo se monta com Bom dia (5h–12h) / Boa tarde (12h–18h) / Boa noite e voa ao logo da faixa | `src/components/welcome/WelcomeOverlay.vue`, `src/composables/useWelcome.ts`, `src/lib/greeting.ts` |
 | Saída | "Cidade sai do logo": a cidade do login se abre em círculo a partir do logo da faixa, "Até logo, Nome", e o cartão do login volta saindo do desfoque | `src/components/welcome/FarewellOverlay.vue`, `src/composables/useFarewell.ts` |
 | Movimento | Troca de página "Suave" (sai esmaecendo, blocos sobem um a um); traço das abas desliza; números contam e barras crescem no Dashboard; linhas de tabela em cascata; botões afundam ao clicar. Tudo parado com movimento reduzido | `src/styles/motion.css`, `src/components/common/CountUp.vue`, `AppTopNav.vue` |
-| Casca do painel | "Faixa institucional" + "Abas com menus" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppTopNav.vue`, `nav-items.ts` |
+| Casca do painel | "Faixa institucional" no topo + menu lateral "Desliza" no computador; gaveta lateral no celular | `src/App.vue`, `src/components/layout/AppSideNav.vue`, `nav-items.ts` |
 | Usuário na faixa | Só as iniciais; nome e papel no menu | `src/components/layout/AppTopbar.vue` |
 | Listas e menus | "Trilho amarelo": painel desce em 550 ms e a linha amarela corre no topo; grupos da barra abrem no hover | `src/styles/motion.css`, `AppTopNav.vue` |
 | Cadastro de veículo | "Índice ao lado": topo e botões fixos, índice que acompanha a rolagem, resumo | `src/components/inventory/AssetFormDialog.vue` |
@@ -64,7 +65,7 @@ Testadas e descartadas (estão nas páginas de acompanhamento): login dividido a
 src/components/
   ui/            shadcn-vue (button, input, select, dialog, alert-dialog, table, sheet...)
   brand/         BrandLockup (SEMADES + PREFCG), GeoMidiaMark/Lockup, geomidia-marks.ts (SVG do símbolo)
-  layout/        AppTopbar (faixa), AppTopNav (abas), AppSidebar (gaveta do celular), nav-items, PageHeader
+  layout/        AppTopbar (faixa), AppSideNav (menu lateral), AppSidebar (gaveta do celular), nav-items, PageHeader
   common/        StatusBadge, ToneBadge, EmptyState, SearchInput, TablePager, CountUp
   form/          FormField, FormSection, AttachmentLinksEditor
   inventory/     AssetFormDialog, RadiusReassessmentDialog

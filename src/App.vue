@@ -1,8 +1,12 @@
 <template>
   <router-view v-if="route.meta.public" />
 
-  <div v-else class="min-h-dvh bg-background text-foreground" :style="{ '--shell-top': isDesktop ? 'calc(7rem + 3px)' : '4rem' }">
-    <!-- No computador: faixa institucional (logo, marcas oficiais e usuário) e, abaixo dela, as abas. -->
+  <div
+    v-else
+    class="min-h-dvh bg-background text-foreground"
+    :style="{ '--shell-top': isDesktop ? 'calc(4rem + 3px)' : '4rem', '--band-h': 'calc(4rem + 3px)' }"
+  >
+    <!-- No computador: faixa institucional (logo, marcas oficiais e usuário) e o menu na lateral. -->
     <div v-if="isDesktop" class="sticky top-0 z-40">
       <app-topbar dark class="lg:pl-5" v-bind="topbarProps" @refresh="refreshCurrentView" @logout="confirmLogout = true">
         <template #start>
@@ -11,9 +15,6 @@
         <template #end><BrandLockup tone="onDark" :height="28" class="mr-2" /></template>
       </app-topbar>
       <span class="block h-[3px] bg-brand-yellow" aria-hidden="true" />
-      <div class="flex h-12 border-b bg-card px-4 lg:px-5" data-welcome-nav>
-        <app-top-nav :active-name="route.name" :can-write="auth.canWrite" :is-admin="auth.role === 'admin'" />
-      </div>
     </div>
 
     <!-- No celular: barra com o botão de menu e o menu na gaveta lateral. -->
@@ -41,8 +42,15 @@
       />
     </template>
 
-    <div>
-      <main class="mx-auto w-full max-w-[1760px] px-4 py-6 lg:px-8 lg:py-8">
+    <!-- No computador, a página fica ao lado do menu lateral. -->
+    <div :class="isDesktop ? 'flex' : undefined">
+      <app-side-nav
+        v-if="isDesktop"
+        :active-name="route.name"
+        :can-write="auth.canWrite"
+        :is-admin="auth.role === 'admin'"
+      />
+      <main class="mx-auto w-full max-w-[1760px] min-w-0 px-4 py-6 lg:px-8 lg:py-8">
         <Alert v-if="auth.error || media.error" variant="destructive" class="mb-6 pr-12">
           <CircleAlert />
           <AlertDescription>{{ auth.error || media.error }}</AlertDescription>
@@ -123,7 +131,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue';
 import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppTopbar from '@/components/layout/AppTopbar.vue';
-import AppTopNav from '@/components/layout/AppTopNav.vue';
+import AppSideNav from '@/components/layout/AppSideNav.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -152,6 +160,7 @@ const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
 const isDesktop = useMediaQuery('(min-width: 1024px)');
+
 const farewell = useFarewell();
 
 const drawer = ref(false);

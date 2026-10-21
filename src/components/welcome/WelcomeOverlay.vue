@@ -33,9 +33,9 @@ import { useWelcome } from '@/composables/useWelcome';
 import { welcomeMessage } from '@/lib/greeting';
 import { useAuthStore } from '@/stores/auth';
 
-// Boas-vindas depois do login, sobre o mesmo fundo claro: as camadas do símbolo surgem, o pino
-// cai do alto com a saudação do horário e, no fim, voa até o logo da faixa enquanto as abas entram
-// pela esquerda.
+// Boas-vindas depois do login, sobre o mesmo fundo do login: as camadas do símbolo surgem, o pino
+// cai do alto com a saudação do horário e, no fim, voa até o logo da faixa enquanto o menu lateral
+// entra pela esquerda.
 // Clique ou Esc pulam.
 const welcome = useWelcome();
 const auth = useAuthStore();
@@ -187,7 +187,7 @@ html.welcome-hide-mark [data-welcome-target] > div > span:first-child {
   visibility: hidden;
 }
 
-/* As abas abaixo da faixa entram pela esquerda enquanto o símbolo pousa. */
+/* O menu lateral entra pela esquerda enquanto o símbolo pousa. */
 html.welcome-nav-in [data-welcome-nav] > nav {
   animation: welcome-nav-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
