@@ -1,97 +1,109 @@
 <template>
   <div>
-    <h1 :class="['text-2xl font-semibold tracking-tight', dark && 'text-white']">Entrar</h1>
-    <p :class="['mt-1', dark ? 'text-white/70' : 'text-muted-foreground']">
-      Use o usuário e a senha fornecidos pela administração do GeoMídia.
-    </p>
+    <div class="text-center">
+      <h1 class="text-[1.625rem] leading-tight font-bold tracking-tight text-brand-night">Acesso ao sistema</h1>
+      <p class="mx-auto mt-2 max-w-72 text-[0.9375rem] text-balance text-muted-foreground">
+        Informe suas credenciais para acessar o GeoMídia.
+      </p>
+    </div>
 
     <Alert v-if="errorMessage" variant="destructive" class="mt-6">
       <CircleAlert />
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
 
-    <form
-      :class="['mt-6 grid gap-5', dark && 'text-white [&_[id$=-error]]:text-[#ffb4ab]']"
-      novalidate
-      @submit.prevent="submit"
-    >
-      <FormField v-slot="{ id, invalid, describedBy }" label="Usuário" :error="usernameError">
-        <Input
-          :id="id"
-          v-model="username"
-          autocomplete="username"
-          class="text-foreground"
-          :aria-invalid="invalid || undefined"
-          :aria-describedby="describedBy"
-          @blur="touched.username = true"
-        />
-      </FormField>
+    <p v-if="helpOpen" class="mt-6 rounded-md bg-muted px-4 py-3 text-sm">
+      Peça a um administrador do GeoMídia para redefinir sua senha.
+    </p>
 
-      <FormField v-slot="{ id, invalid, describedBy }" label="Senha" :error="passwordError">
+    <form class="mt-7 grid gap-4" novalidate @submit.prevent="submit">
+      <div>
         <div class="relative">
+          <UserRound class="pointer-events-none absolute top-1/2 left-3.5 size-[1.125rem] -translate-y-1/2 text-[#314c6c]" />
           <Input
-            :id="id"
+            id="login-username"
+            v-model="username"
+            placeholder="Usuário"
+            aria-label="Usuário"
+            autocomplete="username"
+            class="h-[52px] rounded-lg pl-10"
+            :aria-invalid="Boolean(usernameError) || undefined"
+            :aria-describedby="usernameError ? 'login-username-error' : undefined"
+            @blur="touched.username = true"
+          />
+        </div>
+        <p v-if="usernameError" id="login-username-error" class="mt-1.5 text-sm text-destructive">{{ usernameError }}</p>
+      </div>
+
+      <div>
+        <div class="relative">
+          <LockKeyhole class="pointer-events-none absolute top-1/2 left-3.5 size-[1.125rem] -translate-y-1/2 text-[#314c6c]" />
+          <Input
+            id="login-password"
             v-model="password"
             :type="showPassword ? 'text' : 'password'"
+            placeholder="Senha"
+            aria-label="Senha"
             autocomplete="current-password"
-            class="pr-11 text-foreground"
-            :aria-invalid="invalid || undefined"
-            :aria-describedby="describedBy"
+            class="h-[52px] rounded-lg pr-12 pl-10"
+            :aria-invalid="Boolean(passwordError) || undefined"
+            :aria-describedby="passwordError ? 'login-password-error' : undefined"
             @blur="touched.password = true"
           />
           <button
             type="button"
-            class="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            class="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-lg text-[#314c6c] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
             :aria-pressed="showPassword"
             @click="showPassword = !showPassword"
           >
-            <EyeOff v-if="showPassword" class="size-4" />
-            <Eye v-else class="size-4" />
+            <Eye v-if="showPassword" class="size-[1.125rem]" />
+            <EyeOff v-else class="size-[1.125rem]" />
           </button>
         </div>
-      </FormField>
+        <p v-if="passwordError" id="login-password-error" class="mt-1.5 text-sm text-destructive">{{ passwordError }}</p>
+      </div>
 
       <div class="flex items-center justify-between gap-4">
         <label class="flex cursor-pointer items-center gap-2 text-base">
-          <Checkbox v-model="remember" :class="dark && 'border-white/60'" />
-          Manter conectado
+          <Checkbox v-model="remember" />
+          Lembrar de mim
         </label>
         <button
           type="button"
-          :class="[
-            'rounded-sm text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2',
-            dark ? 'text-[#9fdcfb] focus-visible:ring-brand-yellow' : 'text-primary focus-visible:ring-ring',
-          ]"
+          class="rounded-sm text-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           @click="helpOpen = !helpOpen"
         >
-          Esqueci a senha
+          Esqueceu sua senha?
         </button>
       </div>
-
-      <p v-if="helpOpen" :class="['rounded-md px-4 py-3 text-sm', dark ? 'bg-white/10' : 'bg-muted']">
-        Peça a um administrador do GeoMídia para redefinir sua senha.
-      </p>
 
       <Button
         type="submit"
         size="lg"
-        :class="['w-full text-base', dark && 'bg-brand-yellow text-brand-night hover:bg-brand-yellow/90']"
+        class="mt-1 h-[54px] w-full rounded-lg text-base font-bold tracking-[0.06em] uppercase"
         :disabled="auth.loading"
       >
         <LoaderCircle v-if="auth.loading" class="animate-spin" />
         Entrar
+        <ArrowRight v-if="!auth.loading" />
       </Button>
     </form>
+
+    <div class="mt-5 border-t pt-4 text-center text-[0.8125rem] text-[#405873]">
+      <p class="flex items-center justify-center gap-2">
+        <ShieldCheck class="size-[1.125rem] text-[#35577a]" />
+        Ambiente seguro de gestão municipal
+      </p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { CircleAlert, Eye, EyeOff, LoaderCircle } from '@lucide/vue';
+import { ArrowRight, CircleAlert, Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from '@lucide/vue';
 import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import FormField from '@/components/form/FormField.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -99,8 +111,6 @@ import { Input } from '@/components/ui/input';
 
 import { useWelcome } from '@/composables/useWelcome';
 import { useAuthStore } from '@/stores/auth';
-
-defineProps<{ dark?: boolean }>();
 
 const auth = useAuthStore();
 const welcome = useWelcome();

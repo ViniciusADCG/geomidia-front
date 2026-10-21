@@ -6,13 +6,16 @@
     :class="['welcome fixed inset-0 z-[3000] cursor-pointer overflow-hidden', reduceMotion && 'welcome-reduced']"
     @click="finish"
   >
-    <div ref="backdrop" class="absolute inset-0 bg-[#141b55]">
+    <div ref="backdrop" class="absolute inset-0">
       <LoginBackground />
     </div>
 
-    <div class="absolute inset-0 grid place-items-center px-6 text-center text-white">
+    <div class="absolute inset-0 grid place-items-center px-6 text-center text-brand-night">
       <div class="flex flex-col items-center">
-        <span ref="flyer" class="welcome-assemble block size-36 [&>svg]:size-full" aria-hidden="true" v-html="symbolSvg" />
+        <span ref="flyer" class="welcome-assemble relative block size-36 will-change-transform" aria-hidden="true">
+          <span ref="lightMark" class="absolute inset-0 [&>svg]:size-full" v-html="lightSvg" />
+          <span ref="darkMark" class="absolute inset-0 opacity-0 [&>svg]:size-full" v-html="darkSvg" />
+        </span>
         <p ref="text" class="welcome-text mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">{{ message }}</p>
       </div>
     </div>
@@ -28,7 +31,7 @@ import { useWelcome } from '@/composables/useWelcome';
 import { welcomeMessage } from '@/lib/greeting';
 import { useAuthStore } from '@/stores/auth';
 
-// Boas-vindas depois do login, sobre o mesmo fundo animado: as camadas do símbolo surgem, o pino
+// Boas-vindas depois do login, sobre o mesmo fundo claro: as camadas do símbolo surgem, o pino
 // cai do alto com a saudação do horário e, no fim, voa até o logo da faixa enquanto as abas entram
 // pela esquerda.
 // Clique ou Esc pulam.
@@ -37,13 +40,17 @@ const auth = useAuthStore();
 
 const backdrop = ref<HTMLElement | null>(null);
 const flyer = ref<HTMLElement | null>(null);
+const lightMark = ref<HTMLElement | null>(null);
+const darkMark = ref<HTMLElement | null>(null);
 const text = ref<HTMLElement | null>(null);
 
 const now = ref(new Date());
 const message = computed(() => welcomeMessage(auth.userName, now.value));
 const visible = computed(() => welcome.phase.value === 'greeting' || welcome.phase.value === 'landing');
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const symbolSvg = geomidiaSymbolSvg('onDark');
+// O símbolo se monta na versão para fundo claro e, no voo, passa à versão da faixa azul.
+const lightSvg = geomidiaSymbolSvg('onLight');
+const darkSvg = geomidiaSymbolSvg('onDark');
 
 const GREETING_MS = 2300;
 const LANDING_MS = 850;
@@ -91,6 +98,8 @@ function land() {
       [{ transform: 'none' }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width})` }],
       { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' },
     );
+    lightMark.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' });
+    darkMark.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' });
   } else if (element) {
     element.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.4)' }], { duration: 450, easing: ease, fill: 'forwards' });
   }

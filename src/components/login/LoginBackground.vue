@@ -1,61 +1,14 @@
 <template>
-  <div class="absolute inset-0 overflow-hidden bg-[#141b55]" aria-hidden="true">
-    <canvas ref="canvas" class="absolute inset-0 size-full" />
-  </div>
+  <div class="login-background fixed inset-0" aria-hidden="true" />
 </template>
 
-<script lang="ts">
-// Relógio comum a todas as instâncias: o fundo das boas-vindas continua a cena do login sem pular.
-const CLOCK_START = performance.now();
-</script>
-
-<script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-
-import { loginScene } from '@/components/login/login-background-scenes';
-
-const canvas = ref<HTMLCanvasElement | null>(null);
-let frame = 0;
-let resizeObserver: ResizeObserver | null = null;
-
-function stop() {
-  cancelAnimationFrame(frame);
-  frame = 0;
-  resizeObserver?.disconnect();
-  resizeObserver = null;
+<style scoped>
+/* Fundo da versão anterior do login: rede de pontos e a cidade esmaecida, em tons claros.
+   As boas-vindas e a despedida usam o mesmo fundo, e as animações emendam com o login.
+   Fica preso à tela: se a página rolar, a imagem não muda de escala e não pula na troca.
+   Camada própria: o que se anima por cima não obriga a redesenhar a imagem. */
+.login-background {
+  background: #edf5fa url('/login/fundo.jpg') center / cover no-repeat;
+  will-change: transform;
 }
-
-function start() {
-  stop();
-  const scene = loginScene;
-  const element = canvas.value;
-  const ctx = element?.getContext('2d');
-  if (!element || !ctx) return;
-
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let width = 0;
-  let height = 0;
-  const resize = () => {
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    width = element.clientWidth;
-    height = element.clientHeight;
-    element.width = Math.round(width * ratio);
-    element.height = Math.round(height * ratio);
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    if (reduceMotion) scene(ctx, width, height, 8);
-  };
-  resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(element);
-  resize();
-  if (reduceMotion) return;
-
-  const tick = (now: number) => {
-    scene(ctx, width, height, (now - CLOCK_START) / 1000 + 4);
-    frame = requestAnimationFrame(tick);
-  };
-  frame = requestAnimationFrame(tick);
-}
-
-onMounted(start);
-onBeforeUnmount(stop);
-</script>
+</style>

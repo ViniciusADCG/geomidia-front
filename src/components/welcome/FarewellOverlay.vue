@@ -1,12 +1,15 @@
 <template>
   <div v-if="visible" role="status" aria-live="polite" class="fixed inset-0 z-[3000] overflow-hidden">
-    <div ref="backdrop" class="absolute inset-0 bg-[#141b55]">
+    <div ref="backdrop" class="absolute inset-0">
       <LoginBackground />
     </div>
 
-    <div class="absolute inset-0 grid place-items-center px-6 text-center text-white">
+    <div class="absolute inset-0 grid place-items-center px-6 text-center text-brand-night">
       <div class="flex flex-col items-center">
-        <span ref="symbol" class="block size-36 [&>svg]:size-full" aria-hidden="true" v-html="symbolSvg" />
+        <span ref="symbol" class="relative block size-36" aria-hidden="true">
+          <span ref="darkMark" class="absolute inset-0 [&>svg]:size-full" v-html="darkSvg" />
+          <span ref="lightMark" class="absolute inset-0 opacity-0 [&>svg]:size-full" v-html="lightSvg" />
+        </span>
         <p ref="text" class="mt-6 text-4xl font-semibold tracking-tight opacity-0 sm:text-5xl">{{ message }}</p>
       </div>
     </div>
@@ -21,18 +24,22 @@ import LoginBackground from '@/components/login/LoginBackground.vue';
 import { useFarewell } from '@/composables/useFarewell';
 import { farewellMessage } from '@/lib/greeting';
 
-// Animação de saída ("Cidade sai do logo"): a cidade do login se abre num círculo a partir do logo
+// Animação de saída ("Cidade sai do logo"): o fundo claro do login se abre num círculo a partir do logo
 // da faixa até cobrir o painel, e o símbolo vai do logo ao centro com a despedida. Quando termina, o
 // App encerra a sessão e abre o login, que tem o mesmo fundo; esta camada some sem emenda.
 const farewell = useFarewell();
 
 const backdrop = ref<HTMLElement | null>(null);
 const symbol = ref<HTMLElement | null>(null);
+const darkMark = ref<HTMLElement | null>(null);
+const lightMark = ref<HTMLElement | null>(null);
 const text = ref<HTMLElement | null>(null);
 
 const visible = computed(() => farewell.phase.value === 'leaving');
 const message = computed(() => farewellMessage(farewell.userName.value));
-const symbolSvg = geomidiaSymbolSvg('onDark');
+// O símbolo sai do logo na versão da faixa azul e chega ao centro na versão para fundo claro.
+const darkSvg = geomidiaSymbolSvg('onDark');
+const lightSvg = geomidiaSymbolSvg('onLight');
 const EASE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
 // O logo da faixa, de onde a cidade e o símbolo saem. No celular não há logo do GeoMídia na barra.
@@ -59,6 +66,8 @@ function play() {
         : [{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'none' }],
       { duration: 900, easing: EASE, fill: 'both' },
     );
+    darkMark.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, easing: EASE, fill: 'both' });
+    lightMark.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, easing: EASE, fill: 'both' });
     element.animate([{ opacity: 1 }, { opacity: 0 }], { delay: 1650, duration: 350, easing: 'ease-in', fill: 'forwards' });
   }
 
