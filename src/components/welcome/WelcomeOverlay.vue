@@ -10,11 +10,11 @@
       <LoginBackground />
     </div>
 
-    <div class="absolute inset-0 grid place-items-center px-6 text-center text-brand-night">
+    <div :class="cn('absolute inset-0 grid place-items-center px-6 text-center', darkScene ? 'text-white' : 'text-brand-night')">
       <div class="flex flex-col items-center">
         <span ref="flyer" class="welcome-assemble relative block size-36 will-change-transform" aria-hidden="true">
-          <span ref="lightMark" class="absolute inset-0 [&>svg]:size-full" v-html="lightSvg" />
-          <span ref="darkMark" class="absolute inset-0 opacity-0 [&>svg]:size-full" v-html="darkSvg" />
+          <span v-if="!darkScene" ref="lightMark" class="absolute inset-0 [&>svg]:size-full" v-html="lightSvg" />
+          <span ref="darkMark" :class="cn('absolute inset-0 [&>svg]:size-full', !darkScene && 'opacity-0')" v-html="darkSvg" />
         </span>
         <p ref="text" class="welcome-text mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">{{ message }}</p>
       </div>
@@ -27,6 +27,8 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 import { geomidiaSymbolSvg } from '@/components/brand/geomidia-marks';
 import LoginBackground from '@/components/login/LoginBackground.vue';
+import { isNightAt, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { cn } from '@/lib/utils';
 import { useWelcome } from '@/composables/useWelcome';
 import { welcomeMessage } from '@/lib/greeting';
 import { useAuthStore } from '@/stores/auth';
@@ -38,6 +40,9 @@ import { useAuthStore } from '@/stores/auth';
 const welcome = useWelcome();
 const auth = useAuthStore();
 
+// À noite, texto e símbolo em branco. Lido ao abrir a animação.
+const hourSetting = useSceneHourSetting();
+const darkScene = ref(false);
 const backdrop = ref<HTMLElement | null>(null);
 const flyer = ref<HTMLElement | null>(null);
 const lightMark = ref<HTMLElement | null>(null);
@@ -99,7 +104,7 @@ function land() {
       { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' },
     );
     lightMark.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' });
-    darkMark.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' });
+    if (!darkScene.value) darkMark.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: LANDING_MS - 100, easing: ease, fill: 'forwards' });
   } else if (element) {
     element.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.4)' }], { duration: 450, easing: ease, fill: 'forwards' });
   }
@@ -109,6 +114,7 @@ function land() {
 
 watch(() => welcome.phase.value, async (phase, previous) => {
   if (phase !== 'greeting' || previous === 'greeting') return;
+  darkScene.value = isNightAt(sceneHour(hourSetting.value));
   timers.forEach((id) => window.clearTimeout(id));
   timers = [];
   now.value = new Date();

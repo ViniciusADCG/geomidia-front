@@ -21,22 +21,43 @@
         <LoginForm class="px-6 pt-6 pb-10 sm:px-[38px] sm:pb-11" />
       </div>
     </div>
-    <footer class="login-chrome relative flex flex-col items-center gap-3 text-center text-sm text-[#405873]">
-      <BrandLockup :height="30" />
+    <footer
+      :class="cn(
+        'login-chrome relative mx-auto flex flex-col items-center gap-3 text-center text-sm',
+        sceneTone === 'light' && 'rounded-xl bg-white/80 px-5 py-3 text-[#405873] backdrop-blur-sm',
+        sceneTone === 'dark' && 'rounded-xl bg-brand-night/70 px-5 py-3 text-white/80 backdrop-blur-sm',
+      )"
+    >
+      <BrandLockup :height="30" :tone="sceneTone === 'dark' ? 'onDark' : 'onLight'" />
       <p>Secretaria Municipal de Meio Ambiente, Gestão Urbana e Desenvolvimento Econômico, Turístico e Sustentável</p>
     </footer>
+    <VariantLab v-if="showLab" title="Horário do fundo" :groups="LAB_GROUPS" note="Só aparece em desenvolvimento. O fundo continua nas boas-vindas e na saída." />
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
+
+import VariantLab, { type VariantGroup } from '@/components/dev/VariantLab.vue';
 
 import BrandLockup from '@/components/brand/BrandLockup.vue';
 import GeoMidiaMark from '@/components/brand/GeoMidiaMark.vue';
 import LoginBackground from '@/components/login/LoginBackground.vue';
+import { isNightAt, LOGIN_HOUR_KEY, LOGIN_HOUR_OPTIONS, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
 import LoginForm from '@/components/login/LoginForm.vue';
 import { useFarewell } from '@/composables/useFarewell';
 import { useWelcome } from '@/composables/useWelcome';
+import { cn } from '@/lib/utils';
+
+// Painel para fixar o horário do fundo (só em desenvolvimento).
+const showLab = import.meta.env.DEV;
+const LAB_GROUPS: VariantGroup[] = [{ key: LOGIN_HOUR_KEY, label: 'Horário', fallback: 'agora', options: LOGIN_HOUR_OPTIONS }];
+const hourSetting = useSceneHourSetting();
+// O rodapé acompanha o céu: placa clara de dia, escura à noite. Confere a cada segundo por causa do ciclo.
+const night = ref(isNightAt(sceneHour(hourSetting.value)));
+const toneTimer = window.setInterval(() => { night.value = isNightAt(sceneHour(hourSetting.value)); }, 1000);
+onBeforeUnmount(() => window.clearInterval(toneTimer));
+const sceneTone = computed(() => (night.value ? 'dark' : 'light'));
 
 const welcome = useWelcome();
 const farewell = useFarewell();

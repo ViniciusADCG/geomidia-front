@@ -4,11 +4,11 @@
       <LoginBackground />
     </div>
 
-    <div class="absolute inset-0 grid place-items-center px-6 text-center text-brand-night">
+    <div :class="cn('absolute inset-0 grid place-items-center px-6 text-center', darkScene ? 'text-white' : 'text-brand-night')">
       <div class="flex flex-col items-center">
         <span ref="symbol" class="relative block size-36" aria-hidden="true">
           <span ref="darkMark" class="absolute inset-0 [&>svg]:size-full" v-html="darkSvg" />
-          <span ref="lightMark" class="absolute inset-0 opacity-0 [&>svg]:size-full" v-html="lightSvg" />
+          <span v-if="!darkScene" ref="lightMark" class="absolute inset-0 opacity-0 [&>svg]:size-full" v-html="lightSvg" />
         </span>
         <p ref="text" class="mt-6 text-4xl font-semibold tracking-tight opacity-0 sm:text-5xl">{{ message }}</p>
       </div>
@@ -21,6 +21,8 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import { geomidiaSymbolSvg } from '@/components/brand/geomidia-marks';
 import LoginBackground from '@/components/login/LoginBackground.vue';
+import { isNightAt, sceneHour, useSceneHourSetting } from '@/components/login/login-scenes';
+import { cn } from '@/lib/utils';
 import { useFarewell } from '@/composables/useFarewell';
 import { farewellMessage } from '@/lib/greeting';
 
@@ -29,6 +31,9 @@ import { farewellMessage } from '@/lib/greeting';
 // App encerra a sessão e abre o login, que tem o mesmo fundo; esta camada some sem emenda.
 const farewell = useFarewell();
 
+// À noite, texto e símbolo em branco. Lido ao abrir a animação.
+const hourSetting = useSceneHourSetting();
+const darkScene = ref(false);
 const backdrop = ref<HTMLElement | null>(null);
 const symbol = ref<HTMLElement | null>(null);
 const darkMark = ref<HTMLElement | null>(null);
@@ -66,7 +71,7 @@ function play() {
         : [{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'none' }],
       { duration: 900, easing: EASE, fill: 'both' },
     );
-    darkMark.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, easing: EASE, fill: 'both' });
+    if (!darkScene.value) darkMark.value?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, easing: EASE, fill: 'both' });
     lightMark.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, easing: EASE, fill: 'both' });
     element.animate([{ opacity: 1 }, { opacity: 0 }], { delay: 1650, duration: 350, easing: 'ease-in', fill: 'forwards' });
   }
@@ -87,6 +92,7 @@ watch(visible, async (shown) => {
     document.documentElement.classList.remove('welcome-hide-mark');
     return;
   }
+  darkScene.value = isNightAt(sceneHour(hourSetting.value));
   document.documentElement.classList.add('welcome-hide-mark');
   await nextTick();
   play();
