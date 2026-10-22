@@ -51,14 +51,15 @@ function start() {
   const paint = (now: number) => painter.draw(ctx, width, height, (now - CLOCK_START) / 1000 + 6, sceneHour(hourSetting.value));
   const resize = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    if (element.clientWidth === width && element.clientHeight === height && element.width === Math.round(width * ratio)) return;
     width = element.clientWidth;
     height = element.clientHeight;
     element.width = Math.round(width * ratio);
     element.height = Math.round(height * ratio);
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    // Parado (movimento reduzido ou janela sem foco), redesenha o quadro atual no novo tamanho.
-    if (reduceMotion) paint(CLOCK_START);
-    else if (paused) paint(performance.now());
+    // Mudar o tamanho apaga o canvas: redesenha na hora para não ficar um quadro vazio (a tela
+    // piscava ao abrir as boas-vindas). Parado, mantém o quadro inicial.
+    paint(reduceMotion ? CLOCK_START : performance.now());
   };
   resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(element);
