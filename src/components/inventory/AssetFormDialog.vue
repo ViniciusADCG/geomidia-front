@@ -127,12 +127,7 @@
             <Input :id="id" v-model="form.address" :aria-invalid="invalid || undefined" />
           </FormField>
           <FormField v-slot="{ id }" label="Bairro">
-            <Select v-model="editable.district">
-              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent class="max-h-72">
-                <SelectItem v-for="district in DISTRICT_OPTIONS" :key="district" :value="district">{{ district }}</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchSelect :id="id" v-model="editable.district" :options="DISTRICT_OPTIONS" search-label="Buscar bairro" list-label="Bairros" />
           </FormField>
           <div class="hidden sm:block" aria-hidden="true" />
           <FormField v-slot="{ id, invalid }" label="Latitude" required :error="show('latitude')">
@@ -145,12 +140,7 @@
 
         <FormSection :id="sectionId('veiculo')" class="scroll-mt-2" title="Veículo de comunicação">
           <FormField v-slot="{ id }" label="Tipo de veículo" class="sm:col-span-2">
-            <Select v-model="editable.media_type">
-              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in registrationMediaTypeOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchSelect :id="id" v-model="editable.media_type" :options="registrationMediaTypeOptions" search-label="Buscar tipo de veículo" list-label="Tipos de veículo" />
           </FormField>
           <fieldset v-if="!editingId && formAreaThreshold != null" class="grid gap-2 sm:col-span-2">
             <legend class="text-sm font-medium">
@@ -278,6 +268,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
 import FormField from '@/components/form/FormField.vue';
+import SearchSelect from '@/components/form/SearchSelect.vue';
 import FormSection from '@/components/form/FormSection.vue';
 import RadiusReassessmentDialog from '@/components/inventory/RadiusReassessmentDialog.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';

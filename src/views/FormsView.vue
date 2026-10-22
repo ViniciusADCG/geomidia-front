@@ -211,12 +211,7 @@
               <Input :id="id" v-model="form.number" :aria-invalid="invalid || undefined" />
             </FormField>
             <FormField v-slot="{ id, invalid }" label="Bairro" required :error="show(errors.district)">
-              <Select v-model="form.district">
-                <SelectTrigger :id="id" class="w-full" :aria-invalid="invalid || undefined"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent class="max-h-72">
-                  <SelectItem v-for="district in DISTRICT_OPTIONS" :key="district" :value="district">{{ district }}</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchSelect :id="id" v-model="form.district" :options="DISTRICT_OPTIONS" search-label="Buscar bairro" list-label="Bairros" :invalid="invalid" />
             </FormField>
             <FormField v-slot="{ id, invalid }" label="CEP" required :error="show(errors.postal_code)">
               <Input :id="id" v-model="form.postal_code" placeholder="00000-000" inputmode="numeric" :aria-invalid="invalid || undefined" />
@@ -225,12 +220,7 @@
 
           <FormSection title="Veículo">
             <FormField v-slot="{ id, invalid }" label="Tipo de veículo" required :error="show(errors.media_type)" class="sm:col-span-2">
-              <Select v-model="form.media_type">
-                <SelectTrigger :id="id" class="w-full" :aria-invalid="invalid || undefined"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="option in registrationMediaTypeOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchSelect :id="id" v-model="form.media_type" :options="registrationMediaTypeOptions" search-label="Buscar tipo de veículo" list-label="Tipos de veículo" :invalid="invalid" />
             </FormField>
             <FormField v-slot="{ id }" label="Quantidade de faces" hint="Opcional">
               <Input :id="id" :model-value="form.number_of_faces ?? ''" @update:model-value="form.number_of_faces = String($event)" />
@@ -329,6 +319,7 @@ import StatusBadge from '@/components/common/StatusBadge.vue';
 import TablePager from '@/components/common/TablePager.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
 import FormField from '@/components/form/FormField.vue';
+import SearchSelect from '@/components/form/SearchSelect.vue';
 import FormSection from '@/components/form/FormSection.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';

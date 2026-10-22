@@ -75,23 +75,13 @@
             </span>
           </div>
           <FormField v-slot="{ id }" label="Tipo de veículo">
-            <Select v-model="draft.media_type">
-              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in registrationMediaTypeOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchSelect :id="id" v-model="draft.media_type" :options="registrationMediaTypeOptions" search-label="Buscar tipo de veículo" list-label="Tipos de veículo" />
           </FormField>
           <FormField v-slot="{ id, invalid }" label="Endereço" required :error="draftAttempted && !draft.address.trim() ? 'Informe o endereço.' : null">
             <Input :id="id" v-model="draft.address" :aria-invalid="invalid || undefined" />
           </FormField>
           <FormField v-slot="{ id }" label="Bairro">
-            <Select v-model="draft.district">
-              <SelectTrigger :id="id" class="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent class="max-h-72">
-                <SelectItem v-for="district in DISTRICT_OPTIONS" :key="district" :value="district">{{ district }}</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchSelect :id="id" v-model="draft.district" :options="DISTRICT_OPTIONS" search-label="Buscar bairro" list-label="Bairros" />
           </FormField>
           <fieldset v-if="draftAreaThreshold != null" class="grid gap-2">
             <legend class="text-sm font-medium">
@@ -250,6 +240,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
 import FormField from '@/components/form/FormField.vue';
+import SearchSelect from '@/components/form/SearchSelect.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import AssetDetails from '@/components/map/AssetDetails.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
