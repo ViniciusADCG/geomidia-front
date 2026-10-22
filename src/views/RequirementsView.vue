@@ -1,109 +1,146 @@
 <template>
-  <section class="view-stack">
-    <div class="view-header">
-      <div>
-        <h2>Comunicado de Exigência</h2>
-        <p>Respostas recebidas pelo formulário público, com comprovantes e documentos anexados.</p>
-      </div>
-      <v-btn variant="tonal" prepend-icon="mdi-refresh" :loading="loading" @click="loadResponses">Atualizar</v-btn>
+  <section>
+    <PageHeader
+      title="Comunicados de exigência"
+      description="Respostas enviadas pelo formulário público, com comprovante e documentos anexados."
+    >
+      <template #actions>
+        <Button variant="outline" :disabled="loading" @click="loadResponses">
+          <RefreshCw :class="loading && 'animate-spin'" />
+          Atualizar
+        </Button>
+      </template>
+    </PageHeader>
+
+    <Alert v-if="error && !selected" variant="destructive" class="mb-4">
+      <CircleAlert />
+      <AlertDescription>{{ error }}</AlertDescription>
+    </Alert>
+
+    <div class="overflow-hidden rounded-lg border bg-card">
+      <form class="flex flex-wrap gap-2 border-b p-4" role="search" @submit.prevent="applySearch">
+        <SearchInput
+          v-model="search"
+          class="min-w-64 flex-1"
+          placeholder="Protocolo, processo, comunicado ou e-mail"
+          label="Buscar respostas"
+        />
+        <Button type="submit" variant="secondary" :disabled="loading">Buscar</Button>
+      </form>
+
+      <EmptyState
+        v-if="!loading && page.items.length === 0"
+        :icon="FileWarning"
+        :title="appliedSearch ? 'Nenhuma resposta encontrada' : 'Nenhuma resposta recebida ainda'"
+        :description="appliedSearch ? 'Confira o número digitado ou busque por outro termo.' : 'As respostas enviadas pelo formulário público aparecem aqui.'"
+      />
+      <Table v-else>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Protocolo</TableHead>
+            <TableHead>Processo</TableHead>
+            <TableHead>Comunicado</TableHead>
+            <TableHead class="hidden lg:table-cell">E-mail do requerente</TableHead>
+            <TableHead>Recebido em</TableHead>
+            <TableHead class="text-right">Anexos</TableHead>
+            <TableHead class="w-px"><span class="sr-only">Ações</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="item in page.items" :key="item.id" class="cursor-pointer" @click="select(item)">
+            <TableCell class="font-medium whitespace-nowrap">{{ item.protocol }}</TableCell>
+            <TableCell class="whitespace-nowrap">{{ item.process_number }}</TableCell>
+            <TableCell class="whitespace-nowrap">{{ item.notice_number }}</TableCell>
+            <TableCell class="hidden text-muted-foreground lg:table-cell">{{ item.requester_email }}</TableCell>
+            <TableCell class="whitespace-nowrap">{{ formatDateTime(item.finalized_at) }}</TableCell>
+            <TableCell class="tabular text-right">{{ item.attachments.length }}</TableCell>
+            <TableCell>
+              <Button variant="outline" size="sm" @click.stop="select(item)">Abrir</Button>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+
+      <TablePager
+        v-if="page.total > 0"
+        :offset="page.offset"
+        :limit="page.limit"
+        :total="page.total"
+        :count="page.items.length"
+        :loading="loading"
+        @change="changePage"
+      />
     </div>
 
-    <v-alert v-if="error" type="error" variant="tonal" closable class="mb-4" @click:close="error = ''">
-      {{ error }}
-    </v-alert>
+    <Dialog :open="Boolean(selected)" @update:open="(open) => { if (!open) selected = null; }">
+      <DialogScrollContent v-if="selected" class="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Resposta {{ selected.protocol }}</DialogTitle>
+          <DialogDescription>Recebida em {{ formatDateTime(selected.finalized_at) }}</DialogDescription>
+        </DialogHeader>
 
-    <v-card border class="pa-4 mb-4">
-      <div class="d-flex ga-3 align-center flex-wrap">
-        <v-text-field
-          v-model="search"
-          label="Buscar protocolo, processo, comunicado ou e-mail"
-          prepend-inner-icon="mdi-magnify"
-          hide-details
-          class="flex-grow-1"
-          @keyup.enter="applySearch"
-        />
-        <v-btn color="primary" :loading="loading" @click="applySearch">Buscar</v-btn>
-      </div>
-    </v-card>
+        <Alert v-if="error" variant="destructive">
+          <CircleAlert />
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
 
-    <v-card border>
-      <div class="table-wrap">
-        <v-table hover>
-          <thead>
-            <tr>
-              <th>Protocolo</th>
-              <th>Processo</th>
-              <th>Comunicado</th>
-              <th>E-mail do requerente</th>
-              <th>Recebido em</th>
-              <th>Anexos</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!loading && page.items.length === 0">
-              <td colspan="7">
-                <div class="empty-table">
-                  <v-icon icon="mdi-file-document-alert-outline" size="42" />
-                  <span>Nenhuma resposta de comunicado de exigência encontrada.</span>
-                </div>
-              </td>
-            </tr>
-            <tr v-for="item in page.items" :key="item.id">
-              <td class="process-code">{{ item.protocol }}</td>
-              <td class="process-code">{{ item.process_number }}</td>
-              <td class="process-code">{{ item.notice_number }}</td>
-              <td>{{ item.requester_email }}</td>
-              <td>{{ formatDateTime(item.finalized_at) }}</td>
-              <td>{{ item.attachments.length }}</td>
-              <td>
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-eye-outline" @click="selected = item">
-                  Ver resposta
-                </v-btn>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </div>
-      <v-card-actions v-if="page.total > 0" class="justify-end">
-        <span class="text-body-2 mr-3">{{ page.offset + 1 }}–{{ Math.min(page.offset + page.items.length, page.total) }} de {{ page.total }}</span>
-        <v-btn icon="mdi-chevron-left" size="small" variant="text" :disabled="page.offset === 0 || loading" title="Página anterior" @click="changePage(-1)" />
-        <v-btn icon="mdi-chevron-right" size="small" variant="text" :disabled="page.offset + page.limit >= page.total || loading" title="Próxima página" @click="changePage(1)" />
-      </v-card-actions>
-    </v-card>
+        <dl class="grid gap-x-6 gap-y-4 rounded-md bg-muted/60 p-4 sm:grid-cols-2">
+          <div>
+            <dt class="text-sm text-muted-foreground">Número do processo</dt>
+            <dd class="font-medium">{{ selected.process_number }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-muted-foreground">Número do comunicado</dt>
+            <dd class="font-medium">{{ selected.notice_number }}</dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-sm text-muted-foreground">E-mail do requerente</dt>
+            <dd class="font-medium break-all">{{ selected.requester_email }}</dd>
+          </div>
+        </dl>
 
-    <v-dialog :model-value="Boolean(selected)" max-width="760" scrollable @update:model-value="(open) => { if (!open) selected = null; }">
-      <v-card v-if="selected">
-        <v-card-title>Resposta <span class="process-code">{{ selected.protocol }}</span></v-card-title>
-        <v-card-text>
-          <div class="mb-2"><strong>Número do processo:</strong> <span class="process-code">{{ selected.process_number }}</span></div>
-          <div class="mb-2"><strong>Número do comunicado:</strong> <span class="process-code">{{ selected.notice_number }}</span></div>
-          <div class="mb-2"><strong>E-mail do requerente:</strong> {{ selected.requester_email }}</div>
-          <div class="mb-2"><strong>Recebido em:</strong> {{ formatDateTime(selected.finalized_at) }}</div>
-          <strong>Documentos anexados</strong>
-          <v-list density="compact" class="mt-2">
-            <v-list-item v-for="attachment in selected.attachments" :key="attachment.index">
-              <template #prepend><v-icon icon="mdi-paperclip" /></template>
-              <v-list-item-title>{{ attachment.filename }}</v-list-item-title>
-              <v-list-item-subtitle>{{ formatSize(attachment.size_bytes) }}</v-list-item-subtitle>
-              <template #append>
-                <v-btn size="small" variant="text" prepend-icon="mdi-download-outline" @click="openAttachment(selected, attachment.index)">Baixar</v-btn>
-              </template>
-            </v-list-item>
-          </v-list>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn variant="tonal" prepend-icon="mdi-file-pdf-box" :loading="downloadingPdf" @click="downloadReceipt(selected)">Baixar comprovante PDF</v-btn>
-          <v-spacer />
-          <v-btn variant="text" @click="selected = null">Fechar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <div>
+          <h3 class="font-semibold">Documentos anexados</h3>
+          <ul class="mt-2 divide-y rounded-md border">
+            <li v-for="attachment in selected.attachments" :key="attachment.index" class="flex items-center gap-3 px-4 py-3">
+              <Paperclip class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div class="min-w-0 flex-1">
+                <p class="truncate" :title="attachment.filename">{{ attachment.filename }}</p>
+                <p class="text-sm text-muted-foreground">{{ formatSize(attachment.size_bytes) }}</p>
+              </div>
+              <Button variant="ghost" size="sm" :aria-label="`Baixar ${attachment.filename}`" @click="openAttachment(selected, attachment.index)">
+                <Download />
+                Baixar
+              </Button>
+            </li>
+          </ul>
+        </div>
+
+        <DialogFooter class="sm:justify-between">
+          <Button variant="outline" :disabled="downloadingPdf" @click="downloadReceipt(selected)">
+            <LoaderCircle v-if="downloadingPdf" class="animate-spin" />
+            <FileText v-else />
+            Baixar comprovante PDF
+          </Button>
+          <Button variant="secondary" @click="selected = null">Fechar</Button>
+        </DialogFooter>
+      </DialogScrollContent>
+    </Dialog>
   </section>
 </template>
 
 <script setup lang="ts">
+import { CircleAlert, Download, FileText, FileWarning, LoaderCircle, Paperclip, RefreshCw } from '@lucide/vue';
 import { onMounted, onUnmounted, ref } from 'vue';
+
+import EmptyState from '@/components/common/EmptyState.vue';
+import SearchInput from '@/components/common/SearchInput.vue';
+import TablePager from '@/components/common/TablePager.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { api } from '../services/api';
 import type { Page, RequirementResponse } from '../types';
@@ -144,6 +181,11 @@ function applySearch() {
 function changePage(direction: number) {
   page.value.offset = Math.max(0, page.value.offset + direction * page.value.limit);
   void loadResponses();
+}
+
+function select(item: RequirementResponse) {
+  error.value = '';
+  selected.value = item;
 }
 
 function formatSize(bytes: number): string {

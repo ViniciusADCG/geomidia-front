@@ -1,126 +1,152 @@
 <template>
-  <v-app :class="route.meta.public ? 'public-shell' : 'admin-shell'">
-    <router-view v-if="route.meta.public" />
+  <router-view v-if="route.meta.public" />
 
-    <template v-else>
-      <v-navigation-drawer
-        v-model="drawer"
-        :permanent="display.mdAndUp.value"
-        :temporary="display.smAndDown.value"
-        width="272"
-        class="admin-sidebar"
-      >
-        <div class="brand-block">
-          <img class="brand-mark" src="/Logocircular-arredondado.png" alt="" width="38" height="38" />
-          <div>
-            <h1>GeoMídia</h1>
-            <span>Campo Grande, MS</span>
-          </div>
-        </div>
-
-        <v-list nav density="comfortable" class="px-3">
-          <v-list-item
-            v-for="item in navItems"
-            :key="item.value"
-            :active="route.name === item.value"
-            :to="item.to"
-            :prepend-icon="item.icon"
-            :title="item.title"
-            rounded="lg"
-          />
-        </v-list>
-
-        <template #append>
-          <div class="pa-3">
-            <v-btn
-              block
-              variant="text"
-              color="red-lighten-2"
-              prepend-icon="mdi-logout"
-              class="justify-start"
-              @click="confirmLogout = true"
-            >
-              Sair
-            </v-btn>
-          </div>
+  <div
+    v-else
+    class="min-h-dvh bg-background text-foreground"
+    :style="{ '--shell-top': isDesktop ? 'calc(4rem + 3px)' : '4rem', '--band-h': 'calc(4rem + 3px)' }"
+  >
+    <!-- No computador: faixa institucional (logo, marcas oficiais e usuário) e o menu na lateral. -->
+    <div v-if="isDesktop" class="sticky top-0 z-40">
+      <app-topbar dark class="lg:pl-5" v-bind="topbarProps" @refresh="refreshCurrentView" @logout="confirmLogout = true">
+        <template #start>
+          <div class="w-56" data-welcome-target><GeoMidiaLockup tone="onDark" subtitle="Campo Grande, MS" /></div>
         </template>
-      </v-navigation-drawer>
+        <template #end><BrandLockup tone="onDark" :height="28" class="mr-2" /></template>
+      </app-topbar>
+      <span class="block h-[3px] bg-brand-yellow" aria-hidden="true" />
+    </div>
 
-      <admin-topbar
-        :show-menu="display.smAndDown.value"
-        :loading="media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading)"
-        :role-label="roleLabel"
-        :user-name="auth.userName"
+    <!-- No celular: barra com o botão de menu e o menu na gaveta lateral. -->
+    <template v-else>
+      <Sheet v-model:open="drawer">
+        <SheetContent side="left" class="w-72 gap-0 border-0 bg-sidebar p-0 sm:max-w-72">
+          <SheetTitle class="sr-only">Menu</SheetTitle>
+          <app-sidebar
+            :active-name="route.name"
+            :can-write="auth.canWrite"
+            :is-admin="auth.role === 'admin'"
+            @navigate="drawer = false"
+            @logout="drawer = false; confirmLogout = true"
+          />
+        </SheetContent>
+      </Sheet>
+
+      <app-topbar
+        class="sticky top-0 z-30"
+        show-menu
+        v-bind="topbarProps"
         @toggle-menu="drawer = !drawer"
         @refresh="refreshCurrentView"
+        @logout="confirmLogout = true"
       />
-
-      <v-main class="app-main">
-        <v-container fluid class="app-content">
-          <v-alert
-            v-if="auth.error || media.error"
-            type="error"
-            variant="tonal"
-            density="compact"
-            class="mb-4"
-            closable
-            @click:close="auth.error = null; media.error = null"
-          >
-            {{ auth.error || media.error }}
-          </v-alert>
-
-          <router-view v-slot="{ Component }">
-            <component :is="Component" @navigate="navigate" @view-map="handleViewOnMap" />
-          </router-view>
-        </v-container>
-      </v-main>
-
-      <v-dialog v-model="confirmLogout" max-width="420">
-        <v-card title="Sair do sistema">
-          <v-card-text>
-            Deseja encerrar sua sessão no GeoMídia?
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="confirmLogout = false">Cancelar</v-btn>
-            <v-btn color="error" @click="logout">Sair</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
-
-      <v-dialog v-model="approvalConflictDialog" max-width="560" persistent>
-        <v-card title="Conflito territorial identificado">
-          <v-card-text>
-            <p>{{ approvalConflict?.message }}</p>
-            <p class="mt-3">A aprovação pode ser registrada se essa for sua decisão. Deseja aprovar o processo mesmo assim?</p>
-            <v-list v-if="approvalConflict?.conflicts.length" density="compact" class="mt-3">
-              <v-list-item
-                v-for="conflict in approvalConflict.conflicts"
-                :key="conflict.conflicting_asset_id"
-                :title="conflict.process_code"
-                :subtitle="`${Math.round(conflict.distance_meters)} m de distância; mínimo ${conflict.minimum_distance_meters} m`"
-                prepend-icon="mdi-alert-circle-outline"
-              />
-            </v-list>
-            <p class="mt-3 text-medium-emphasis">Sua confirmação e os conflitos encontrados serão registrados no histórico do processo.</p>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="resolveApprovalConflict(false)">Cancelar</v-btn>
-            <v-btn color="warning" @click="resolveApprovalConflict(true)">Aprovar mesmo assim</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
     </template>
-  </v-app>
+
+    <!-- No computador, a página fica ao lado do menu lateral. -->
+    <div :class="isDesktop ? 'flex' : undefined">
+      <app-side-nav
+        v-if="isDesktop"
+        :active-name="route.name"
+        :can-write="auth.canWrite"
+        :is-admin="auth.role === 'admin'"
+      />
+      <main class="mx-auto w-full max-w-[1760px] min-w-0 px-4 py-6 lg:px-8 lg:py-8">
+        <Alert v-if="auth.error || media.error" variant="destructive" class="mb-6 pr-12">
+          <CircleAlert />
+          <AlertDescription>{{ auth.error || media.error }}</AlertDescription>
+          <button
+            type="button"
+            class="absolute top-2.5 right-2.5 rounded-sm p-1 opacity-70 hover:opacity-100"
+            aria-label="Fechar aviso"
+            @click="auth.error = null; media.error = null"
+          >
+            <X class="size-4" />
+          </button>
+        </Alert>
+
+        <router-view v-slot="{ Component, route: current }">
+          <Transition name="page" mode="out-in" :duration="{ leave: 120, enter: 480 }">
+            <component :is="Component" :key="current.path" @navigate="navigate" @view-map="handleViewOnMap" />
+          </Transition>
+        </router-view>
+      </main>
+    </div>
+
+    <AlertDialog :open="confirmLogout" @update:open="confirmLogout = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sair do GeoMídia?</AlertDialogTitle>
+          <AlertDialogDescription>Sua sessão será encerrada neste navegador.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="confirmLogout = false">Cancelar</Button>
+          <Button variant="destructive" @click="logout">Sair</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="approvalConflictDialog" @update:open="(open) => { if (!open) resolveApprovalConflict(false); }">
+      <AlertDialogContent class="sm:max-w-xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Conflito territorial identificado</AlertDialogTitle>
+          <AlertDialogDescription class="text-foreground">{{ approvalConflict?.message }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul v-if="approvalConflict?.conflicts.length" class="divide-y rounded-md border">
+          <li
+            v-for="conflict in approvalConflict.conflicts"
+            :key="conflict.conflicting_asset_id"
+            class="flex items-start gap-3 px-4 py-3"
+          >
+            <TriangleAlert class="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+            <div>
+              <p class="tabular font-semibold">{{ conflict.process_code }}</p>
+              <p class="tabular text-sm text-muted-foreground">
+                {{ Math.round(conflict.distance_meters) }} m de distância; mínimo {{ conflict.minimum_distance_meters }} m
+              </p>
+            </div>
+          </li>
+        </ul>
+        <p class="text-sm text-muted-foreground">
+          Você pode aprovar mesmo assim. A decisão e os conflitos encontrados ficam registrados no histórico do processo.
+        </p>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="resolveApprovalConflict(false)">Cancelar</Button>
+          <Button class="bg-warning text-white hover:bg-warning/90" @click="resolveApprovalConflict(true)">Aprovar mesmo assim</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </div>
+
+  <WelcomeOverlay />
+  <FarewellOverlay />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useDisplay } from 'vuetify';
+import { CircleAlert, TriangleAlert, X } from '@lucide/vue';
+import { useMediaQuery } from '@vueuse/core';
 
-import AdminTopbar from './components/AdminTopbar.vue';
+import BrandLockup from '@/components/brand/BrandLockup.vue';
+import GeoMidiaLockup from '@/components/brand/GeoMidiaLockup.vue';
+import AppSidebar from '@/components/layout/AppSidebar.vue';
+import AppTopbar from '@/components/layout/AppTopbar.vue';
+import AppSideNav from '@/components/layout/AppSideNav.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import FarewellOverlay from '@/components/welcome/FarewellOverlay.vue';
+import WelcomeOverlay from '@/components/welcome/WelcomeOverlay.vue';
+import { useFarewell } from '@/composables/useFarewell';
+
 import type { ApprovalConflictPrompt } from './types';
 import { APPROVAL_CONFLICT_EVENT } from './utils/approval-conflict-confirmation';
 import { exitVisualPreview, isVisualPreview } from './router';
@@ -133,8 +159,11 @@ const media = useMediaStore();
 const mapState = useMapStore();
 const route = useRoute();
 const router = useRouter();
-const display = useDisplay();
-const drawer = ref(true);
+const isDesktop = useMediaQuery('(min-width: 1024px)');
+
+const farewell = useFarewell();
+
+const drawer = ref(false);
 const confirmLogout = ref(false);
 const approvalConflictDialog = ref(false);
 const approvalConflict = ref<ApprovalConflictPrompt | null>(null);
@@ -146,26 +175,12 @@ if (isVisualPreview()) {
   auth.userName = 'Administrador GeoMídia';
 }
 
-const navItems = computed(() => [
-  { title: 'Dashboard', value: 'dashboard', to: '/', icon: 'mdi-view-dashboard-outline' },
-  { title: 'Mapa GIS', value: 'map', to: '/mapa', icon: 'mdi-map-outline' },
-  { title: 'Inventário', value: 'inventory', to: '/inventario', icon: 'mdi-folder-table-outline' },
-  { title: 'Vencimentos', value: 'expirations', to: '/vencimentos', icon: 'mdi-calendar-alert-outline' },
-  ...(auth.canWrite
-    ? [
-      { title: 'Solicitações Recebidas', value: 'forms', to: '/formularios', icon: 'mdi-inbox-arrow-down-outline' },
-      { title: 'Comunicado de Exigência', value: 'requirements', to: '/comunicados-de-exigencia', icon: 'mdi-file-document-alert-outline' },
-    ]
-    : []),
-  ...(auth.role === 'admin'
-    ? [
-      { title: 'Usuários', value: 'users', to: '/usuarios', icon: 'mdi-account-cog-outline' },
-      { title: 'Regras de Negócio', value: 'rules', to: '/regras', icon: 'mdi-tune-variant' },
-    ]
-    : []),
-]);
-
 const roleLabel = computed(() => ({ admin: 'Administrador', analyst: 'Analista GeoMídia', viewer: 'Consulta' }[auth.role ?? 'viewer']));
+const topbarProps = computed(() => ({
+  loading: media.loading || (route.name === 'inventory' && media.inventoryLoading) || (route.name === 'map' && mapState.loading),
+  roleLabel: roleLabel.value,
+  userName: auth.userName,
+}));
 
 onMounted(() => {
   window.addEventListener('geomidia:unauthorized', handleUnauthorized);
@@ -257,10 +272,12 @@ function handleUnauthorized(event: Event) {
   void router.push({ name: 'login' });
 }
 
-function logout() {
+async function logout() {
   confirmLogout.value = false;
+  await farewell.leave(auth.userName);
   exitVisualPreview();
   auth.logout();
-  void router.push({ name: 'login' });
+  await router.push({ name: 'login' });
+  farewell.arrive();
 }
 </script>

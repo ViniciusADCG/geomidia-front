@@ -1,60 +1,59 @@
 <template>
-  <section class="view-stack">
-    <div class="view-header">
-      <div>
-        <h2>Vencimentos</h2>
-        <p>Acompanhe autorizações próximas do vencimento e processos já vencidos.</p>
-      </div>
-      <v-btn
-        variant="outlined"
-        prepend-icon="mdi-refresh"
-        :loading="loading"
-        @click="loadExpirations"
-      >
-        Atualizar
-      </v-btn>
+  <section>
+    <PageHeader title="Vencimentos" description="Autorizações que vencem nos próximos 90 dias e as que já venceram.">
+      <template #actions>
+        <Button variant="outline" :disabled="loading" @click="loadExpirations">
+          <RefreshCw :class="loading && 'animate-spin'" />
+          Atualizar
+        </Button>
+      </template>
+    </PageHeader>
+
+    <Alert v-if="error" variant="destructive" class="mb-4">
+      <CircleAlert />
+      <AlertDescription>{{ error }}</AlertDescription>
+    </Alert>
+
+    <p v-if="overview.reference_date" class="mb-4 text-sm text-muted-foreground">
+      Janela considerada: de <span class="tabular font-medium text-foreground">{{ formatDate(overview.reference_date) }}</span>
+      até <span class="tabular font-medium text-foreground">{{ formatDate(overview.window_end_date) }}</span>.
+    </p>
+
+    <div class="grid items-start gap-4 2xl:grid-cols-2">
+      <ExpirationListCard
+        id="vencidos"
+        :class="['scroll-mt-40', highlight === 'vencidos' && 'section-flash']"
+        title="Vencidos"
+        subtitle="A data de vencimento já passou"
+        :items="overview.expired"
+        :reference-date="overview.reference_date"
+        mode="expired"
+        @view-map="viewOnMap"
+      />
+      <ExpirationListCard
+        id="proximos"
+        :class="['scroll-mt-40', highlight === 'proximos' && 'section-flash']"
+        title="Próximos ao vencimento"
+        subtitle="Vencem nos próximos 90 dias"
+        :items="overview.expiring_soon"
+        :reference-date="overview.reference_date"
+        mode="upcoming"
+        @view-map="viewOnMap"
+      />
     </div>
-
-    <v-alert v-if="error" type="error" variant="tonal" closable @click:close="error = ''">
-      {{ error }}
-    </v-alert>
-
-    <v-alert v-if="overview.reference_date" type="info" variant="tonal" density="compact">
-      A janela de próximos vencimentos vai de {{ formatDate(overview.reference_date) }} até
-      {{ formatDate(overview.window_end_date) }}.
-    </v-alert>
-
-    <v-row align="start">
-      <v-col cols="12" xl="6">
-        <expiration-list-card
-          title="Próximos ao Vencimento"
-          subtitle="Autorizações que vencem nos próximos 90 dias"
-          :items="overview.expiring_soon"
-          :reference-date="overview.reference_date"
-          mode="upcoming"
-          @view-map="viewOnMap"
-        />
-      </v-col>
-
-      <v-col cols="12" xl="6">
-        <expiration-list-card
-          title="Vencidos"
-          subtitle="Autorizações com data de vencimento ultrapassada"
-          :items="overview.expired"
-          :reference-date="overview.reference_date"
-          mode="expired"
-          @view-map="viewOnMap"
-        />
-      </v-col>
-    </v-row>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { CircleAlert, RefreshCw } from '@lucide/vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-import ExpirationListCard from '../components/ExpirationListCard.vue';
+import ExpirationListCard from '@/components/expirations/ExpirationListCard.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+
 import { api } from '../services/api';
 import { useMediaStore } from '../stores/media';
 import type { ExpirationOverview, MediaAsset } from '../types';
@@ -68,6 +67,9 @@ const EMPTY_OVERVIEW: ExpirationOverview = {
 };
 
 const router = useRouter();
+const route = useRoute();
+// Vindo do Dashboard com #vencidos ou #proximos: a lista certa é trazida à vista e pisca de leve.
+const highlight = ref('');
 const media = useMediaStore();
 const overview = ref<ExpirationOverview>({ ...EMPTY_OVERVIEW });
 const loading = ref(false);
@@ -75,8 +77,17 @@ const error = ref('');
 
 onMounted(() => {
   window.addEventListener('geomidia:expirations-refresh', loadExpirations);
-  void loadExpirations();
+  void loadExpirations().then(focusFromHash);
 });
+
+async function focusFromHash() {
+  const id = route.hash.replace('#', '');
+  if (id !== 'vencidos' && id !== 'proximos') return;
+  await nextTick();
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  highlight.value = id;
+  window.setTimeout(() => { highlight.value = ''; }, 1600);
+}
 onUnmounted(() => window.removeEventListener('geomidia:expirations-refresh', loadExpirations));
 
 async function loadExpirations() {

@@ -1,713 +1,263 @@
 <template>
-  <section class="view-stack">
-    <div class="view-header">
-      <div>
-        <h2>Inventário de Ativos de Mídia</h2>
-        <p>Cadastre, revise e localize veículos de comunicação exterior.</p>
+  <section>
+    <PageHeader title="Inventário" description="Veículos de comunicação exterior cadastrados, com raio, situação e localização.">
+      <template v-if="auth.canWrite" #actions>
+        <Button @click="openCreateDialog">
+          <Plus />
+          Novo cadastro
+        </Button>
+      </template>
+    </PageHeader>
+
+    <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="grid gap-2 border-b p-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <SearchInput
+          :model-value="media.inventorySearchDraft"
+          placeholder="Endereço, bairro, processo ou empresa"
+          label="Buscar no inventário"
+          @update:model-value="media.scheduleInventorySearch($event)"
+        />
+        <Select :model-value="media.inventoryTypeFilter" @update:model-value="media.changeInventoryType($event as typeof media.inventoryTypeFilter)">
+          <SelectTrigger class="w-full" aria-label="Filtrar por tipo"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="option in typeFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select :model-value="media.inventoryStatusFilter" @update:model-value="media.changeInventoryStatus($event as typeof media.inventoryStatusFilter)">
+          <SelectTrigger class="w-full" aria-label="Filtrar por status"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="option in statusFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-      <v-btn v-if="auth.canWrite" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">
-        Novo Cadastro
-      </v-btn>
+
+      <div v-if="media.inventoryLoading" class="grid gap-3 p-4" aria-label="Carregando inventário">
+        <Skeleton v-for="n in 5" :key="n" class="h-12" />
+      </div>
+      <EmptyState
+        v-else-if="media.inventoryError"
+        :icon="CircleAlert"
+        title="Não foi possível carregar o inventário"
+        :description="media.inventoryError"
+      >
+        <Button variant="outline" @click="media.refreshInventory()">Tentar novamente</Button>
+      </EmptyState>
+      <EmptyState
+        v-else-if="media.inventoryItems.length === 0"
+        :icon="SearchX"
+        :title="emptyTitle"
+        :description="hasInventoryFilters ? 'Ajuste a busca ou os filtros.' : undefined"
+      />
+
+      <template v-else>
+        <ul class="divide-y xl:hidden">
+          <li v-for="asset in visibleInventoryItems" :key="asset.id" class="px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="font-medium">{{ asset.official_process_code || asset.process_code }}</p>
+              <StatusBadge :status="asset.status" />
+            </div>
+            <p class="mt-1">{{ asset.address }}, {{ asset.district }}</p>
+            <p class="mt-0.5 text-sm text-muted-foreground">
+              {{ mediaTypeLabel(asset.media_type) }}, raio de <span class="tabular">{{ asset.radius_meters }}</span> m
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <Button v-if="auth.canWrite && asset.status === 'novos processos'" size="sm" :disabled="media.saving" @click="startAnalysis(asset)">
+                <Play />
+                Iniciar análise
+              </Button>
+              <Button v-if="auth.canDelete" variant="outline" size="sm" @click="openEditDialog(asset)"><Pencil />Editar</Button>
+              <Button v-if="auth.canWrite" variant="outline" size="sm" @click="$emit('view-map', asset.id)"><MapPin />Mapa</Button>
+              <Button v-if="auth.canWrite" variant="ghost" size="sm" class="text-destructive hover:bg-danger-soft hover:text-destructive" @click="askDelete(asset)">
+                <Trash2 />Excluir
+              </Button>
+            </div>
+          </li>
+        </ul>
+
+        <Table class="hidden xl:table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Processo</TableHead>
+              <TableHead>Local</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead class="text-right">Raio</TableHead>
+              <TableHead class="hidden 2xl:table-cell">Coordenadas</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead class="w-px"><span class="sr-only">Ações</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="asset in visibleInventoryItems" :key="asset.id">
+              <TableCell class="whitespace-nowrap">
+                <span class="font-medium">{{ asset.official_process_code || asset.process_code }}</span>
+                <span v-if="asset.official_process_code" class="block text-sm text-muted-foreground">Origem {{ asset.process_code }}</span>
+              </TableCell>
+              <TableCell class="min-w-48">
+                {{ asset.address }}
+                <span class="block text-sm text-muted-foreground">{{ asset.district }}</span>
+              </TableCell>
+              <TableCell class="min-w-40">{{ mediaTypeLabel(asset.media_type) }}</TableCell>
+              <TableCell class="tabular text-right whitespace-nowrap">{{ asset.radius_meters }} m</TableCell>
+              <TableCell class="hidden text-sm whitespace-nowrap text-muted-foreground 2xl:table-cell">
+                {{ formatCoordinate(asset.latitude) }}, {{ formatCoordinate(asset.longitude) }}
+              </TableCell>
+              <TableCell class="whitespace-nowrap">{{ formatDate(asset.expiration_date) }}</TableCell>
+              <TableCell><StatusBadge :status="asset.status" /></TableCell>
+              <TableCell>
+                <div class="flex justify-end gap-1">
+                  <Button
+                    v-if="auth.canWrite && asset.status === 'novos processos'"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-primary"
+                    :aria-label="`Iniciar análise de ${asset.process_code}`"
+                    title="Iniciar análise"
+                    :disabled="media.saving"
+                    @click="startAnalysis(asset)"
+                  >
+                    <Play />
+                  </Button>
+                  <Button v-if="auth.canWrite" variant="ghost" size="icon-sm" :aria-label="`Ver ${asset.process_code} no mapa`" title="Ver no mapa" @click="$emit('view-map', asset.id)">
+                    <MapPin />
+                  </Button>
+                  <Button v-if="auth.canDelete" variant="ghost" size="icon-sm" :aria-label="`Editar ${asset.process_code}`" title="Editar" @click="openEditDialog(asset)">
+                    <Pencil />
+                  </Button>
+                  <Button
+                    v-if="auth.canWrite"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-destructive hover:bg-danger-soft hover:text-destructive"
+                    :aria-label="`Excluir ${asset.process_code}`"
+                    title="Excluir"
+                    @click="askDelete(asset)"
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </template>
+
+      <TablePager
+        v-if="!media.inventoryError"
+        :offset="(media.inventoryPage - 1) * media.inventoryPageSize"
+        :limit="media.inventoryPageSize"
+        :total="media.inventoryLoading ? 0 : media.inventoryTotal"
+        :count="media.inventoryItems.length"
+        :loading="media.inventoryLoading"
+        @change="(direction) => media.changeInventoryPage(media.inventoryPage + direction)"
+      >
+        <label class="flex items-center gap-2">
+          <span class="hidden sm:inline">Por página</span>
+          <Select :model-value="String(media.inventoryPageSize)" @update:model-value="media.changeInventoryPageSize(Number($event))">
+            <SelectTrigger size="sm" class="w-20" aria-label="Itens por página"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="size in [25, 50, 100]" :key="size" :value="String(size)">{{ size }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+      </TablePager>
     </div>
 
-    <v-card border class="pa-4">
-      <v-row dense>
-        <v-col cols="12" md="6">
-          <v-text-field
-            :model-value="media.inventorySearchDraft"
-            label="Buscar endereço, bairro, processo ou empresa"
-            prepend-inner-icon="mdi-magnify"
-            hide-details
-            @update:model-value="media.scheduleInventorySearch($event)"
-          />
-        </v-col>
-        <v-col cols="12" md="3">
-          <v-select
-            :model-value="media.inventoryTypeFilter"
-            :items="typeFilterOptions"
-            label="Tipo"
-            hide-details
-            @update:model-value="media.changeInventoryType($event)"
-          />
-        </v-col>
-        <v-col cols="12" md="3">
-          <v-select
-            :model-value="media.inventoryStatusFilter"
-            :items="statusFilterOptions"
-            label="Status"
-            hide-details
-            @update:model-value="media.changeInventoryStatus($event)"
-          />
-        </v-col>
-      </v-row>
-    </v-card>
+    <AssetFormDialog v-model:open="dialog" :asset="editingAsset" />
 
-    <v-card border>
-      <div class="table-wrap">
-        <v-table hover>
-          <thead>
-            <tr>
-              <th>Processo</th>
-              <th>Endereço</th>
-              <th>Bairro</th>
-              <th>Tipo</th>
-              <th class="text-center">Raio registrado</th>
-              <th>Coordenadas</th>
-              <th>Vencimento</th>
-              <th>Status</th>
-              <th class="text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="media.inventoryLoading || media.inventoryError || media.inventoryItems.length === 0">
-              <td colspan="9">
-                <div class="empty-table">
-                  <v-progress-circular v-if="media.inventoryLoading" indeterminate color="primary" />
-                  <template v-else-if="media.inventoryError">
-                    <span>Erro ao carregar o inventário: {{ media.inventoryError }}</span>
-                    <v-btn variant="text" @click="media.refreshInventory()">Tentar novamente</v-btn>
-                  </template>
-                  <template v-else>
-                    <v-icon icon="mdi-database-search-outline" size="42" />
-                    <span v-if="!media.inventoryLoaded">Carregando inventário...</span>
-                    <span v-else-if="media.inventoryTotal === 0 && !hasInventoryFilters">Nenhum veículo cadastrado.</span>
-                    <span v-else-if="media.inventoryTotal === 0">Nenhum resultado para a busca e os filtros atuais.</span>
-                    <span v-else>Esta página está vazia. Atualize o inventário.</span>
-                  </template>
-                </div>
-              </td>
-            </tr>
-            <tr v-for="asset in visibleInventoryItems" :key="asset.id">
-              <td class="process-code">{{ asset.official_process_code || asset.process_code }}<small v-if="asset.official_process_code" class="origin-code">Origem: {{ asset.process_code }}</small></td>
-              <td class="address-cell">{{ asset.address }}</td>
-              <td>{{ asset.district }}</td>
-              <td class="type-cell">{{ mediaTypeLabel(asset.media_type) }}</td>
-              <td class="text-center mono">{{ asset.radius_meters }}m</td>
-              <td class="mono muted">
-                {{ formatCoordinate(asset.latitude) }}, {{ formatCoordinate(asset.longitude) }}
-              </td>
-              <td class="mono">{{ formatDate(asset.expiration_date) }}</td>
-              <td>
-                <v-chip :color="statusColor(asset.status)" size="small" variant="tonal" class="status-chip">
-                  {{ statusLabel(asset.status) }}
-                </v-chip>
-              </td>
-              <td>
-                <div class="row-actions">
-                  <v-btn
-                    v-if="auth.canWrite"
-                    icon="mdi-eye-outline"
-                    size="small"
-                    variant="tonal"
-                    title="Visualizar no mapa"
-                    @click="$emit('view-map', asset.id)"
-                  />
-                  <v-btn
-                    v-if="auth.canWrite && asset.status === 'novos processos'"
-                    icon="mdi-play-circle-outline"
-                    size="small"
-                    color="info"
-                    variant="tonal"
-                    title="Iniciar análise"
-                    :loading="media.saving"
-                    @click="startAnalysis(asset)"
-                  />
-                  <v-btn
-                    v-if="auth.canDelete"
-                    icon="mdi-pencil-outline"
-                    size="small"
-                    variant="tonal"
-                    title="Editar ativo"
-                    @click="openEditDialog(asset)"
-                  />
-                  <v-btn
-                    v-if="auth.canWrite"
-                    icon="mdi-trash-can-outline"
-                    size="small"
-                    color="error"
-                    variant="tonal"
-                    title="Excluir ativo"
-                    @click="deleteTarget = asset"
-                  />
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </div>
-      <div class="table-footer">
-        <span v-if="media.inventoryLoading">Carregando inventário...</span>
-        <span v-else-if="media.inventoryError">Falha ao carregar resultados</span>
-        <span v-else-if="media.inventoryTotal">Exibindo {{ inventoryStart }}–{{ inventoryEnd }} de {{ media.inventoryTotal }}</span>
-        <span v-else>0 resultados</span>
-        <v-select
-          :model-value="media.inventoryPageSize"
-          :items="[25, 50, 100]"
-          label="Por página"
-          density="compact"
-          hide-details
-          style="max-width: 135px"
-          @update:model-value="media.changeInventoryPageSize($event)"
-        />
-      </div>
-      <v-pagination
-        v-if="!media.inventoryLoading && !media.inventoryError && media.inventoryPageCount > 1"
-        :model-value="media.inventoryPage"
-        :length="media.inventoryPageCount"
-        :total-visible="5"
-        aria-label="Páginas do inventário"
-        @update:model-value="media.changeInventoryPage($event)"
-      />
-    </v-card>
-
-    <v-dialog v-model="dialog" max-width="860" scrollable>
-      <v-card>
-        <v-card-title>
-          {{ editingId ? 'Editar Cadastro' : 'Novo Cadastro de Veículo' }}
-        </v-card-title>
-        <v-card-subtitle>
-          <template v-if="editingAsset">Raio registrado: {{ editingAsset.radius_meters }}m</template>
-          <template v-else>Raio pela regra atual: {{ calculatedRadius }}m</template>
-        </v-card-subtitle>
-
-        <v-card-text>
-          <v-form v-model="formValid" class="form-grid" @submit.prevent="save">
-            <h4 class="form-section-title span-2">Dados do processo</h4>
-            <v-text-field v-if="editingAsset" :model-value="editingAsset.process_code" label="Protocolo de origem" readonly />
-            <v-text-field v-if="editingAsset" v-model="form.official_process_code" label="Protocolo oficial" maxlength="80" hint="Após a protocolização oficial, aparece como protocolo principal." persistent-hint />
-            <v-text-field v-if="editingAsset" :model-value="formatDateTime(editingAsset.created_at)" label="Criado em" readonly />
-            <v-text-field v-if="editingAsset" :model-value="formatDateTime(editingAsset.updated_at)" label="Atualizado em" readonly />
-            <h4 class="form-section-title span-2">Requerente / empresa</h4>
-            <template v-if="selectedForm">
-              <v-text-field v-model="formDetails.company_responsible" label="Empresa / responsável" :rules="[required]" maxlength="120" />
-              <v-text-field v-model="formDetails.company_cnpj" label="CNPJ" maxlength="14" />
-              <v-text-field v-model="formDetails.municipal_registration" label="Inscrição municipal" :rules="[required]" />
-              <v-text-field v-model="formDetails.requester_email" label="E-mail do solicitante" type="email" :rules="[required]" />
-            </template>
-            <v-text-field v-model="form.contact_name" label="Contato do solicitante" />
-            <v-text-field v-if="!selectedForm" v-model="form.contact_email" label="E-mail do solicitante" type="email" />
-            <h4 class="form-section-title span-2">Local de instalação</h4>
-            <v-text-field v-if="selectedForm" v-model="formDetails.property_registration" label="Inscrição imobiliária" :rules="[required]" />
-            <v-text-field v-if="selectedForm" v-model="formDetails.street" label="Logradouro" :rules="[required]" />
-            <v-text-field v-if="selectedForm" v-model="formDetails.number" label="Número" :rules="[required]" />
-            <v-text-field v-if="selectedForm" v-model="formDetails.postal_code" label="CEP" :rules="[required]" />
-            <v-select
-              v-model="editable.district"
-              :items="DISTRICT_OPTIONS"
-              label="Bairro"
-            />
-            <v-text-field
-              v-if="!selectedForm"
-              v-model="form.address"
-              label="Endereço completo"
-              :rules="[required, minLength(3)]"
-              class="span-2"
-            />
-            <v-text-field
-              v-model.number="editable.latitude"
-              label="Latitude"
-              type="number"
-              step="any"
-              :rules="[coordinateRule(-20.65, -20.30, 'Latitude')]"
-            />
-            <v-text-field
-              v-model.number="editable.longitude"
-              label="Longitude"
-              type="number"
-              step="any"
-              :rules="[coordinateRule(-54.80, -54.40, 'Longitude')]"
-            />
-            <h4 class="form-section-title span-2">Veículo de comunicação</h4>
-            <v-select
-              v-model="editable.media_type"
-              :items="registrationMediaTypeOptions"
-              label="Tipo de veículo"
-            />
-            <v-select
-              v-if="!editingId && formAreaThreshold != null"
-              v-model="form.area_rule_classification"
-              :label="`O painel possui área superior ao limite de ${formAreaThreshold} m²?`"
-              :items="[{ title: 'Não', value: 'within_limit' }, { title: 'Sim', value: 'above_limit' }]"
-              :rules="[required]"
-            />
-            <v-text-field
-              v-model.number="form.width_m"
-              label="Largura (m)"
-              type="number"
-              min="0"
-              :rules="[nonNegative]"
-            />
-            <v-text-field
-              v-model.number="form.top_height_m"
-              label="Borda superior (m)"
-              type="number"
-            />
-            <v-text-field
-              v-model="editable.expiration_date"
-              label="Vencimento da autorização"
-              type="date"
-              hint="Opcional"
-              persistent-hint
-            />
-            <v-text-field v-if="selectedForm" v-model="formDetails.number_of_faces" label="Quantidade de faces" />
-            <v-text-field v-if="editingAsset" :model-value="`${editingAsset.radius_meters} m`" label="Raio registrado" readonly />
-            <v-text-field v-if="editingAsset && currentRadiusAvailable" :model-value="`${calculatedRadius} m`" label="Raio pela regra atual (prévia)" readonly />
-            <v-alert v-if="editingAsset && !currentRadiusAvailable" type="warning" variant="tonal" class="span-2">
-              A classificação histórica não permite calcular com segurança o raio pela regra atual.
-            </v-alert>
-            <h4 class="form-section-title span-2">Análise</h4>
-            <v-text-field
-              v-if="!editingId || form.status === 'novos processos'"
-              model-value="Novos Processos"
-              label="Status"
-              hint="Use a ação Iniciar análise para liberar as demais situações."
-              persistent-hint
-              readonly
-            />
-            <v-select
-              v-else
-              v-model="form.status"
-              :items="DECISION_STATUS_OPTIONS"
-              label="Status"
-            />
-            <v-textarea
-              v-model="form.justification"
-              label="Justificativa jurídica ou territorial"
-              rows="3"
-              class="span-2"
-            />
-            <h4 v-if="editingId" class="form-section-title span-2">Anexos do formulário</h4>
-            <v-alert v-if="editingId && media.applicationFormsLoading" type="info" density="compact" variant="tonal" class="span-2">Carregando solicitação e anexos...</v-alert>
-            <v-alert v-if="editingId && media.applicationFormsError" type="warning" density="compact" variant="tonal" class="span-2">
-              {{ media.applicationFormsError }}
-              <v-btn variant="text" size="small" @click="retrySelectedForm">Tentar novamente</v-btn>
-            </v-alert>
-            <div v-if="selectedForm?.attachments.length" class="form-attachment-list span-2">
-              <div v-for="attachment in selectedForm.attachments" :key="attachment.id" class="form-attachment-item">
-                <div>
-                  <strong>{{ attachment.original_filename }}</strong>
-                  <span>{{ attachmentCategoryLabel(attachment.category) }} · {{ attachment.content_type }}</span>
-                </div>
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-open-in-new" @click="openUploadedAttachment(attachment)">Abrir</v-btn>
-              </div>
-            </div>
-            <div v-else-if="editingId && media.applicationFormsLoaded" class="attachment-link-empty span-2">Nenhum anexo enviado pelo formulário para este veículo.</div>
-            <h4 class="form-section-title span-2">Links adicionados manualmente</h4>
-            <div class="attachment-crud span-2">
-              <div class="attachment-crud-header">
-                <strong>Links de anexos</strong>
-                <span>Fotos, PDFs e arquivos relacionados</span>
-              </div>
-              <div class="attachment-crud-row">
-                <v-text-field
-                  v-model="attachmentLinkDraft"
-                  label="Adicionar link"
-                  placeholder="https://..."
-                  hide-details
-                  @keydown.enter.prevent="addAttachmentLink"
-                />
-                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addAttachmentLink">
-                  Adicionar
-                </v-btn>
-              </div>
-              <div v-if="attachmentLinks.length" class="attachment-link-list">
-                <div v-for="(link, index) in attachmentLinks" :key="`${link}-${index}`" class="attachment-link-item">
-                  <v-btn
-                    :href="link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="text"
-                    density="comfortable"
-                    prepend-icon="mdi-open-in-new"
-                    class="attachment-link-button"
-                  >
-                    {{ link }}
-                  </v-btn>
-                  <v-btn
-                    icon="mdi-close"
-                    size="small"
-                    variant="text"
-                    color="error"
-                    title="Remover link"
-                    @click="removeAttachmentLink(index)"
-                  />
-                </div>
-              </div>
-              <div v-else-if="!formManualLinks.length" class="attachment-link-empty">Nenhum link adicionado ainda.</div>
-              <div v-for="(link, index) in formManualLinks" :key="`form-${index}`" class="attachment-link-item">
-                <v-btn :href="link" target="_blank" rel="noopener noreferrer" variant="text" class="attachment-link-button">{{ link }}</v-btn>
-                <span>Do formulário</span>
-              </div>
-            </div>
-          </v-form>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-btn v-if="editingAsset && auth.canDelete" variant="text" @click="openRadiusReassessment">Reavaliar raio</v-btn>
-          <v-spacer />
-          <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="media.saving" :disabled="!formValid || (Boolean(editingId) && !media.applicationFormsLoaded)" @click="save">Salvar Cadastro</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="reassessmentDialog" max-width="560">
-      <v-card title="Reavaliação administrativa do raio">
-        <v-card-text>
-          <v-progress-circular v-if="reassessmentLoading" indeterminate />
-          <v-alert v-if="reassessmentError" type="error" variant="tonal">{{ reassessmentError }}</v-alert>
-          <template v-if="reassessmentPreview">
-            <p>Raio registrado: {{ reassessmentPreview.registered_radius_meters }} m</p>
-            <p>Raio pela regra atual: {{ reassessmentPreview.current_radius_meters == null ? 'indisponível' : `${reassessmentPreview.current_radius_meters} m` }}</p>
-            <p>Condição usada: {{ reassessmentPreview.condition }}</p>
-            <v-alert v-if="!reassessmentPreview.can_reassess" type="warning" variant="tonal">
-              {{ reassessmentPreview.reason_unavailable }}
-            </v-alert>
-            <v-textarea v-else v-model="reassessmentReason" label="Motivo da reavaliação" :rules="[(value) => validReassessmentReason(String(value ?? '')) || 'Informe ao menos 10 caracteres.']" />
-          </template>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="reassessmentDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="reassessmentLoading" :disabled="!reassessmentPreview?.can_reassess || !validReassessmentReason(reassessmentReason)" @click="confirmRadiusReassessment">Confirmar reavaliação</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-if="auth.canWrite" v-model="deleteDialog" max-width="440">
-      <v-card title="Confirmar exclusão">
-        <v-card-text>
-          Remover permanentemente o processo
-          <strong class="process-code">{{ deleteTarget?.process_code }}</strong> do inventário?
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="deleteTarget = null">Cancelar</v-btn>
-          <v-btn color="error" :loading="media.saving" @click="confirmDelete">Excluir</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AlertDialog v-if="auth.canWrite" :open="Boolean(deleteTarget)" @update:open="!$event && (deleteTarget = null)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir o processo {{ deleteTarget?.process_code }}?</AlertDialogTitle>
+          <AlertDialogDescription>O veículo sai do inventário e do mapa. Essa ação não pode ser desfeita.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <Alert v-if="media.error" variant="destructive">
+          <CircleAlert />
+          <AlertDescription>{{ media.error }}</AlertDescription>
+        </Alert>
+        <AlertDialogFooter>
+          <Button variant="outline" @click="deleteTarget = null">Cancelar</Button>
+          <Button variant="destructive" :disabled="media.saving" @click="confirmDelete">
+            <LoaderCircle v-if="media.saving" class="animate-spin" />
+            Excluir processo
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { CircleAlert, LoaderCircle, MapPin, Pencil, Play, Plus, SearchX, Trash2 } from '@lucide/vue';
+import { computed, onMounted, ref } from 'vue';
 
+import EmptyState from '@/components/common/EmptyState.vue';
+import SearchInput from '@/components/common/SearchInput.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
+import TablePager from '@/components/common/TablePager.vue';
+import AssetFormDialog from '@/components/inventory/AssetFormDialog.vue';
+import PageHeader from '@/components/layout/PageHeader.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  DECISION_STATUS_OPTIONS,
-  DISTRICT_OPTIONS,
-  MEDIA_TYPE_OPTIONS,
-  STATUS_OPTIONS,
-  getRequiredRadius,
-  canPreviewCurrentRadius,
-  validReassessmentReason,
-  mediaTypeOptionsFromRules,
-  mediaTypeLabel,
-  statusLabel,
-  statusColor,
-} from '../domain/rules';
-import { useMediaStore } from '../stores/media';
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+import { MEDIA_TYPE_OPTIONS, STATUS_OPTIONS, mediaTypeLabel } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
-import { api } from '../services/api';
-import type { ApplicationForm, ApplicationFormAttachment, ApplicationFormInput, LinkedApplicationFormUpdate, MediaAsset, MediaAssetInput, RadiusReassessmentPreview } from '../types';
-import { formatCoordinate, formatDate, formatDateTime } from '../utils/format';
-import { attachmentCategoryLabel, openApplicationFormAttachment } from '../utils/application-form-attachments';
-import { joinAttachmentLinks, normalizeAttachmentLink, parseAttachmentLinks } from '../utils/attachment-links';
+import { useMediaStore } from '../stores/media';
+import type { MediaAsset } from '../types';
+import { formatCoordinate, formatDate } from '../utils/format';
 
 defineEmits<{ 'view-map': [id: string] }>();
 
 const media = useMediaStore();
 const auth = useAuthStore();
 const dialog = ref(false);
-const editingId = ref<string | null>(null);
 const editingAsset = ref<MediaAsset | null>(null);
-const reassessmentDialog = ref(false);
-const reassessmentLoading = ref(false);
-const reassessmentError = ref('');
-const reassessmentReason = ref('');
-const reassessmentPreview = ref<RadiusReassessmentPreview | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
-const formValid = ref(false);
-const attachmentLinkDraft = ref('');
-const attachmentLinks = ref<string[]>([]);
 const visibleInventoryItems = computed(() => media.inventoryLoading || media.inventoryError ? [] : media.inventoryItems);
 const hasInventoryFilters = computed(() => Boolean(media.inventorySearch || media.inventorySearchDraft.trim()
   || media.inventoryTypeFilter !== 'all' || media.inventoryStatusFilter !== 'all'));
-const inventoryStart = computed(() => (media.inventoryPage - 1) * media.inventoryPageSize + 1);
-const inventoryEnd = computed(() => (media.inventoryPage - 1) * media.inventoryPageSize + media.inventoryItems.length);
+const emptyTitle = computed(() => {
+  if (!media.inventoryLoaded) return 'Carregando inventário';
+  if (media.inventoryTotal === 0 && !hasInventoryFilters.value) return 'Nenhum veículo cadastrado';
+  if (media.inventoryTotal === 0) return 'Nenhum resultado para a busca e os filtros atuais';
+  return 'Esta página está vazia. Atualize o inventário.';
+});
 onMounted(() => { void media.refreshInventory(); });
-const required = (value: string) => Boolean(value?.trim()) || 'Campo obrigatório.';
-const minLength = (length: number) => (value: string) => value.trim().length >= length || `Mínimo de ${length} caracteres.`;
-const nonNegative = (value: number) => Number(value) >= 0 || 'Informe um valor igual ou maior que zero.';
-const coordinateRule = (min: number, max: number, label: string) => (value: number) => (
-  (Number(value) >= min && Number(value) <= max) || `${label} fora da área de Campo Grande.`
-);
 
 const typeFilterOptions = computed(() => [
   { title: 'Todos os tipos', value: 'all' },
   ...MEDIA_TYPE_OPTIONS,
 ]);
 
-const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
-
 const statusFilterOptions = computed(() => [
   { title: 'Todos os status', value: 'all' },
   ...STATUS_OPTIONS,
 ]);
 
-const form = reactive<MediaAssetInput>(blankForm());
-const formAreaThreshold = computed(() => media.rules.find(
-  (rule) => rule.media_type === form.media_type && rule.is_active,
-)?.area_threshold_m2 ?? null);
-watch(() => form.media_type, () => {
-  if (!editingId.value) form.area_rule_classification = null;
-});
-const formDetails = reactive<ApplicationFormInput>(blankFormDetails());
-const selectedForm = computed(() => media.applicationForms.find((item) => item.asset_id === editingId.value) ?? null);
-const editable = computed(() => selectedForm.value ? formDetails : form);
-const formManualLinks = computed(() => parseAttachmentLinks(selectedForm.value?.attachment_links).filter((link) => /^https?:\/\//i.test(link)));
-
-watch(selectedForm, (value) => {
-  if (value) Object.assign(formDetails, formDetailsFrom(value));
-});
-
-const deleteDialog = computed({
-  get: () => Boolean(deleteTarget.value),
-  set: (value: boolean) => {
-    if (!value) deleteTarget.value = null;
-  },
-});
-
-const calculatedRadius = computed(() => getRequiredRadius(
-  editable.value.media_type, editable.value.area_m2, media.rules, editable.value.area_rule_classification,
-));
-const currentRadiusAvailable = computed(() => canPreviewCurrentRadius(
-  editable.value.media_type, editable.value.area_m2, media.rules,
-));
-
-async function openRadiusReassessment() {
-  if (!editingAsset.value || auth.role !== 'admin') return;
-  reassessmentDialog.value = true;
-  reassessmentPreview.value = null;
-  reassessmentReason.value = '';
-  reassessmentError.value = '';
-  reassessmentLoading.value = true;
-  try {
-    reassessmentPreview.value = await api.previewRadiusReassessment(editingAsset.value.id);
-  } catch (error) {
-    reassessmentError.value = error instanceof Error ? error.message : 'Falha ao carregar a prévia.';
-  } finally {
-    reassessmentLoading.value = false;
-  }
-}
-
-async function confirmRadiusReassessment() {
-  const preview = reassessmentPreview.value;
-  if (!editingAsset.value || !preview?.can_reassess || !preview.rule_updated_at || !validReassessmentReason(reassessmentReason.value)) return;
-  reassessmentLoading.value = true;
-  reassessmentError.value = '';
-  try {
-    const updated = await api.confirmRadiusReassessment(editingAsset.value.id, {
-      reason: reassessmentReason.value.trim(),
-      expected_registered_radius_meters: preview.registered_radius_meters,
-      expected_rule_updated_at: preview.rule_updated_at,
-    });
-    editingAsset.value = updated;
-    reassessmentDialog.value = false;
-    await media.refreshInventory();
-  } catch (error) {
-    reassessmentError.value = error instanceof Error ? error.message : 'Falha ao confirmar a reavaliação.';
-  } finally {
-    reassessmentLoading.value = false;
-  }
-}
-
-function blankForm(): MediaAssetInput {
-  return {
-    media_type: 'outdoor',
-    official_process_code: null,
-    address: '',
-    district: 'Centro',
-    latitude: -20.464,
-    longitude: -54.612,
-    area_m2: null,
-    area_rule_classification: null,
-    width_m: 9,
-    bottom_height_m: null,
-    top_height_m: null,
-    expiration_date: null,
-    status: 'novos processos',
-    justification: '',
-    attachment_links: '',
-    contact_name: '',
-    contact_email: '',
-  };
-}
-
-function blankFormDetails(): ApplicationFormInput {
-  return {
-    company_responsible: '', company_cnpj: null, municipal_registration: '', property_registration: '',
-    street: '', number: '', district: 'Centro', postal_code: '', latitude: -20.464, longitude: -54.612,
-    media_type: 'outdoor', area_m2: null, area_rule_classification: null, bottom_height_m: null, number_of_faces: null,
-    expiration_date: null, requester_email: '', attachment_links: null,
-  };
-}
-
-function formDetailsFrom(value: ApplicationForm): ApplicationFormInput {
-  return {
-    company_responsible: value.company_responsible,
-    company_cnpj: value.company_cnpj,
-    municipal_registration: value.municipal_registration,
-    property_registration: value.property_registration,
-    street: value.street,
-    number: value.number,
-    district: value.district,
-    postal_code: value.postal_code,
-    latitude: value.latitude,
-    longitude: value.longitude,
-    media_type: value.media_type,
-    area_m2: value.area_m2,
-    area_rule_classification: value.area_rule_classification,
-    bottom_height_m: value.bottom_height_m,
-    number_of_faces: value.number_of_faces,
-    expiration_date: value.expiration_date,
-    requester_email: value.requester_email,
-    attachment_links: value.attachment_links,
-  };
-}
-
-function resetAttachmentLinks(value: string | null | undefined = '') {
-  attachmentLinks.value = parseAttachmentLinks(value);
-  attachmentLinkDraft.value = '';
-}
-
-function addAttachmentLink() {
-  const link = normalizeAttachmentLink(attachmentLinkDraft.value);
-  if (!link) return;
-  if (!attachmentLinks.value.includes(link)) {
-    attachmentLinks.value = [...attachmentLinks.value, link];
-  }
-  attachmentLinkDraft.value = '';
-}
-
-function removeAttachmentLink(index: number) {
-  attachmentLinks.value = attachmentLinks.value.filter((_, currentIndex) => currentIndex !== index);
-}
-
-function sanitizeForm(): MediaAssetInput {
-  return {
-    ...form,
-    width_m: form.width_m || null,
-    top_height_m: form.top_height_m || null,
-    expiration_date: form.expiration_date || null,
-    justification: form.justification || null,
-    attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
-    contact_name: form.contact_name || null,
-    contact_email: form.contact_email || null,
-  };
-}
-
 function openCreateDialog() {
-  editingId.value = null;
   editingAsset.value = null;
-  Object.assign(form, blankForm());
-  resetAttachmentLinks('');
   dialog.value = true;
 }
 
 function openEditDialog(asset: MediaAsset) {
-  editingId.value = asset.id;
   editingAsset.value = asset;
-  Object.assign(form, {
-    official_process_code: asset.official_process_code ?? null,
-    media_type: asset.media_type,
-    address: asset.address,
-    district: asset.district,
-    latitude: asset.latitude,
-    longitude: asset.longitude,
-    area_m2: asset.area_m2,
-    area_rule_classification: asset.area_rule_classification ?? null,
-    width_m: asset.width_m ?? null,
-    bottom_height_m: asset.bottom_height_m,
-    top_height_m: asset.top_height_m ?? null,
-    expiration_date: asset.expiration_date ?? null,
-    status: asset.status,
-    justification: asset.justification ?? '',
-    attachment_links: asset.attachment_links ?? '',
-    contact_name: asset.contact_name ?? '',
-    contact_email: asset.contact_email ?? '',
-  });
-  resetAttachmentLinks(asset.attachment_links);
   dialog.value = true;
-  void media.loadApplicationFormForInventory(asset.id);
 }
 
-function retrySelectedForm() {
-  if (editingId.value) void media.loadApplicationFormForInventory(editingId.value);
-}
-
-async function openUploadedAttachment(attachment: ApplicationFormAttachment) {
-  if (!selectedForm.value) return;
-  try {
-    await openApplicationFormAttachment(selectedForm.value.id, attachment.id);
-  } catch (error) {
-    media.error = error instanceof Error ? error.message : 'Falha ao abrir o anexo.';
-  }
-}
-
-async function save() {
-  if (!formValid.value || (!selectedForm.value && !form.address.trim())) return;
-  if (editingId.value && !media.applicationFormsLoaded) return;
-
-  try {
-    await media.runInventoryMutation(saveChanges);
-    dialog.value = false;
-  } catch {
-    // O store publica o erro no alerta global.
-  }
-}
-
-async function saveChanges() {
-  if (editingId.value) {
-    if (selectedForm.value) {
-      const formPayload = {
-        ...formDetailsFrom(selectedForm.value),
-        ...formDetails,
-        company_cnpj: formDetails.company_cnpj || null,
-        number_of_faces: formDetails.number_of_faces || null,
-        expiration_date: formDetails.expiration_date || null,
-      };
-      const formChanges = Object.fromEntries(Object.entries(formPayload).filter(
-        ([key, value]) => [
-          'company_responsible', 'company_cnpj', 'municipal_registration', 'property_registration',
-          'street', 'number', 'district', 'postal_code', 'latitude', 'longitude', 'media_type',
-          'number_of_faces', 'expiration_date', 'requester_email',
-        ].includes(key) && value !== selectedForm.value?.[key as keyof ApplicationForm],
-      )) as LinkedApplicationFormUpdate['form'];
-      const assetPayload = {
-        official_process_code: form.official_process_code?.trim() || null,
-        width_m: form.width_m || null,
-        top_height_m: form.top_height_m || null,
-        status: form.status,
-        justification: form.justification || null,
-        contact_name: form.contact_name || null,
-        attachment_links: joinAttachmentLinks(attachmentLinks.value) || null,
-      };
-      const assetChanges = Object.fromEntries(Object.entries(assetPayload).filter(
-        ([key, value]) => value !== editingAsset.value?.[key as keyof MediaAsset],
-      )) as LinkedApplicationFormUpdate['asset'];
-      if (Object.keys(formChanges).length || Object.keys(assetChanges).length) {
-        await media.updateLinkedAsset(editingId.value, selectedForm.value.id, formChanges, assetChanges);
-      }
-    } else {
-      const changes = Object.fromEntries(Object.entries(sanitizeForm()).filter(
-        ([key]) => !['area_m2', 'bottom_height_m', 'area_rule_classification'].includes(key),
-      )) as Partial<MediaAssetInput>;
-      await media.updateAsset(editingId.value, changes);
-    }
-  } else {
-    await media.createAsset(sanitizeForm());
-  }
+function askDelete(asset: MediaAsset) {
+  media.error = null;
+  deleteTarget.value = asset;
 }
 
 async function startAnalysis(asset: MediaAsset) {

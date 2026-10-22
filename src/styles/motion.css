@@ -1,0 +1,181 @@
+/* Movimento do painel: troca de página e detalhes das telas. Tudo fica parado com movimento reduzido. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Linhas de tabela entram em cascata quando aparecem (carga, filtro, página seguinte). */
+  tbody > [data-slot="table-row"] {
+    animation: motion-row 320ms ease-out both;
+  }
+
+  tbody > [data-slot="table-row"]:nth-child(2) { animation-delay: 30ms; }
+  tbody > [data-slot="table-row"]:nth-child(3) { animation-delay: 60ms; }
+  tbody > [data-slot="table-row"]:nth-child(4) { animation-delay: 90ms; }
+  tbody > [data-slot="table-row"]:nth-child(5) { animation-delay: 120ms; }
+  tbody > [data-slot="table-row"]:nth-child(6) { animation-delay: 150ms; }
+  tbody > [data-slot="table-row"]:nth-child(7) { animation-delay: 180ms; }
+  tbody > [data-slot="table-row"]:nth-child(8) { animation-delay: 210ms; }
+  tbody > [data-slot="table-row"]:nth-child(n + 9) { animation-delay: 240ms; }
+
+  /* Barras de gráfico crescem a partir da esquerda. */
+  .motion-bar {
+    transform-origin: left;
+    animation: motion-grow 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both;
+  }
+
+  /* Lista que se abre a partir de um atalho: um contorno amarelo pisca de leve. */
+  .section-flash {
+    animation: section-flash 1.6s ease-out;
+  }
+
+  /* A rosca do Dashboard aparece esmaecendo. */
+  .motion-ring {
+    animation: motion-ring 700ms ease-out 150ms both;
+  }
+
+  /* Troca de página ("Suave"): a página esmaece ao sair; ao entrar, os blocos sobem um a um. */
+  .page-leave-active { transition: opacity 120ms ease-in; }
+  .page-leave-to { opacity: 0; }
+  .page-enter-active > * { animation: motion-rise 320ms ease-out both; }
+  .page-enter-active > :nth-child(2) { animation-delay: 50ms; }
+  .page-enter-active > :nth-child(3) { animation-delay: 100ms; }
+  .page-enter-active > :nth-child(n + 4) { animation-delay: 150ms; }
+}
+
+@keyframes motion-row {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes motion-grow {
+  from { transform: scaleX(0); }
+}
+
+@keyframes section-flash {
+  0%, 60% { box-shadow: 0 0 0 3px var(--brand-yellow); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+@keyframes motion-ring {
+  from { opacity: 0; }
+}
+
+@keyframes motion-rise {
+  from { opacity: 0; transform: translateY(18px); }
+}
+
+/* Abertura de listas e menus suspensos ("Trilho amarelo"): o painel desliza de trás do campo e uma
+   linha amarela corre no topo da esquerda para a direita. Ao fechar, some rápido. Vale para todo
+   Select e DropdownMenu do sistema, inclusive os menus da barra. */
+:is([data-slot="select-content"], [data-slot="dropdown-menu-content"]) {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"] {
+    animation: menu-slide 550ms cubic-bezier(0.33, 1, 0.68, 1) both;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"][data-side="top"] {
+    animation-name: menu-slide-up;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"]::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: 2px;
+    background: var(--brand-yellow);
+    transform-origin: left;
+    animation: menu-rail 320ms cubic-bezier(0.2, 0.8, 0.2, 1) 230ms both;
+    pointer-events: none;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="closed"] {
+    animation: menu-out 100ms ease-in both;
+  }
+}
+
+/* Movimento reduzido: o painel abre e fecha na hora, só com o traço amarelo parado. */
+@media (prefers-reduced-motion: reduce) {
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"]) {
+    animation: none;
+  }
+
+  :is([data-slot="select-content"], [data-slot="dropdown-menu-content"])[data-state="open"]::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: var(--brand-yellow);
+  }
+}
+
+@keyframes menu-slide {
+  from { opacity: 0; transform: translateY(-18px); }
+}
+
+@keyframes menu-slide-up {
+  from { opacity: 0; transform: translateY(18px); }
+}
+
+@keyframes menu-rail {
+  from { transform: scaleX(0); }
+}
+
+@keyframes menu-out {
+  to { opacity: 0; }
+}
+
+/* Pop-ups ("Mola com trilho"): o fundo vira um véu azul com desfoque, o cartão cresce passando um
+   pouco do tamanho e volta, e a linha amarela corre no topo, como nas listas. Ao fechar, some rápido.
+   Vale para todo Dialog do sistema; as confirmações (AlertDialog) seguem como estão. */
+[data-slot="dialog-overlay"] {
+  background: rgb(27 36 99 / 0.45);
+  backdrop-filter: blur(3px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="dialog-overlay"][data-state="open"] {
+    animation: dlg-fade 300ms ease-out both;
+  }
+
+  [data-slot="dialog-overlay"][data-state="closed"] {
+    animation: dlg-fade-out 220ms ease-in both;
+  }
+
+  [data-slot="dialog-content"][data-state="open"] {
+    animation: dlg-spring 500ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  }
+
+  [data-slot="dialog-content"][data-state="open"]::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 2;
+    height: 3px;
+    background: var(--brand-yellow);
+    transform-origin: left;
+    animation: menu-rail 450ms cubic-bezier(0.2, 0.8, 0.2, 1) 100ms both;
+    pointer-events: none;
+  }
+
+  [data-slot="dialog-content"][data-state="closed"] {
+    animation: dlg-out 180ms ease-in both;
+  }
+}
+
+@keyframes dlg-fade {
+  from { opacity: 0; }
+}
+
+@keyframes dlg-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes dlg-out {
+  to { opacity: 0; transform: scale(0.98); }
+}
+
+@keyframes dlg-spring {
+  from { opacity: 0; transform: scale(0.86); }
+  30% { opacity: 1; }
+}

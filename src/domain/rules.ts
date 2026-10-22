@@ -474,7 +474,7 @@ export function mediaTypeColor(mediaType: MediaType): string {
     outdoor: '#2f80ed',
     'front light': '#219653',
     triface: '#7b61ff',
-    'painel de led': '#f2994a',
+    'painel de led': '#8a5a00',
     'painel eletronico modular': '#ef6c00',
     empena: '#d9468f',
     'empena de led': '#0e9f9a',
