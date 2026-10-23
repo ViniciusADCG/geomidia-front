@@ -65,7 +65,7 @@
                 <Play />
                 Iniciar análise
               </Button>
-              <Button v-if="auth.canDelete" variant="outline" size="sm" @click="openEditDialog(asset)"><Pencil />Editar</Button>
+              <Button v-if="auth.canWrite" variant="outline" size="sm" @click="openEditDialog(asset)"><Pencil />Editar</Button>
               <Button v-if="auth.canWrite" variant="outline" size="sm" @click="$emit('view-map', asset.id)"><MapPin />Mapa</Button>
               <Button v-if="auth.canWrite" variant="ghost" size="sm" class="text-destructive hover:bg-danger-soft hover:text-destructive" @click="askDelete(asset)">
                 <Trash2 />Excluir
@@ -121,7 +121,7 @@
                   <Button v-if="auth.canWrite" variant="ghost" size="icon-sm" :aria-label="`Ver ${asset.process_code} no mapa`" title="Ver no mapa" @click="$emit('view-map', asset.id)">
                     <MapPin />
                   </Button>
-                  <Button v-if="auth.canDelete" variant="ghost" size="icon-sm" :aria-label="`Editar ${asset.process_code}`" title="Editar" @click="openEditDialog(asset)">
+                  <Button v-if="auth.canWrite" variant="ghost" size="icon-sm" :aria-label="`Editar ${asset.process_code}`" title="Editar" @click="openEditDialog(asset)">
                     <Pencil />
                   </Button>
                   <Button
