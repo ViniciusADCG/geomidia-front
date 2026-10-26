@@ -451,12 +451,12 @@ export const useMediaStore = defineStore('media', {
         if (generation(this) === session) this.saving = false;
       }
     },
-    async deleteAsset(id: string) {
+    async deleteAsset(id: string, reason: string) {
       const session = generation(this);
       this.saving = true;
       this.error = null;
       try {
-        await api.deleteMediaAsset(id);
+        await api.deleteMediaAsset(id, reason);
         if (generation(this) !== session) return;
         this.assets = this.assets.filter((asset) => asset.id !== id);
         if (this.selectedAssetId === id) this.selectedAssetId = null;

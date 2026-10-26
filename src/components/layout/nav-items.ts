@@ -3,6 +3,7 @@ import {
   FileWarning,
   Inbox,
   LayoutDashboard,
+  History,
   Map,
   SlidersHorizontal,
   TableProperties,
@@ -37,6 +38,7 @@ export function navGroups(canWrite: boolean, isAdmin: boolean): NavGroup[] {
       ? [{
         label: 'Administração',
         items: [
+          { title: 'Rastreabilidade', name: 'tracking', to: '/rastreabilidade', icon: History },
           { title: 'Usuários', name: 'users', to: '/usuarios', icon: UsersRound },
           { title: 'Regras de negócio', name: 'rules', to: '/regras', icon: SlidersHorizontal },
         ],

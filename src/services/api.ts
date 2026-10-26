@@ -19,6 +19,9 @@ import type {
   MediaStats,
   MediaStatus,
   MediaType,
+  AnalystActivitySummary,
+  TrackedAnalyst,
+  TrackedProcess,
   RadiusReassessmentPreview,
   Page,
   RequirementResponse,
@@ -201,8 +204,8 @@ export const api = {
       method: 'POST', body: JSON.stringify(input),
     });
   },
-  deleteMediaAsset(id: string) {
-    return request<void>(`/media-assets/${id}`, { method: 'DELETE' });
+  deleteMediaAsset(id: string, reason: string) {
+    return request<void>(`/media-assets/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
   },
   getMediaStats() {
     return request<MediaStats>('/media-assets/stats');
@@ -215,6 +218,42 @@ export const api = {
   },
   startMediaAssetAnalysis(id: string) {
     return request<MediaAsset>(`/media-assets/${id}/start-analysis`, { method: 'POST' });
+  },
+  listAnalystActivitySummary(params: { fromDate?: string; toDate?: string } = {}) {
+    return request<AnalystActivitySummary[]>(`/process-tracking/analysts/summary${queryString({
+      from_date: params.fromDate, to_date: params.toDate,
+    })}`);
+  },
+  listDeletedProcessTracking(params: {
+    search?: string; fromDate?: string; toDate?: string;
+    analystId?: string; currentStatus?: MediaStatus; limit?: number; offset?: number;
+  } = {}) {
+    return request<Page<TrackedProcess>>(`/process-tracking/deleted${queryString({
+      search: params.search,
+      from_date: params.fromDate,
+      to_date: params.toDate,
+      analyst_id: params.analystId,
+      current_status: params.currentStatus,
+      limit: params.limit,
+      offset: params.offset,
+    })}`);
+  },
+  listTrackedAnalysts() {
+    return request<TrackedAnalyst[]>('/process-tracking/analysts');
+  },
+  listProcessTracking(params: {
+    search?: string; fromDate?: string; toDate?: string;
+    analystId?: string; currentStatus?: MediaStatus; limit?: number; offset?: number;
+  } = {}) {
+    return request<Page<TrackedProcess>>(`/process-tracking${queryString({
+      search: params.search,
+      from_date: params.fromDate,
+      to_date: params.toDate,
+      analyst_id: params.analystId,
+      current_status: params.currentStatus,
+      limit: params.limit,
+      offset: params.offset,
+    })}`);
   },
   listActivities(limit = 30, offset = 0) {
     return request<Page<ActivityLog>>(`/activities${queryString({ limit, offset })}`);
@@ -272,8 +311,8 @@ export const api = {
       method: 'PATCH', body: JSON.stringify(input),
     });
   },
-  deleteApplicationForm(id: string) {
-    return request<void>(`/application-forms/${id}`, { method: 'DELETE' });
+  deleteApplicationForm(id: string, reason: string) {
+    return request<void>(`/application-forms/${id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
   },
   getApplicationFormAttachmentDownload(formId: string, attachmentId: string) {
     return request<{ url: string }>(`/application-forms/${formId}/attachments/${attachmentId}/download`);
