@@ -51,7 +51,7 @@ describe('Inventário paginado', () => {
     const store = useMediaStore();
     await store.loadInventory();
     expect(api.listMediaAssets).toHaveBeenCalledWith({
-      search: undefined, mediaType: undefined, status: undefined, limit: 50, offset: 0,
+      search: undefined, mediaTypes: [], status: undefined, limit: 50, offset: 0,
     });
     expect(store.inventoryTotal).toBe(101);
     expect(store.inventoryPageCount).toBe(3);
@@ -86,25 +86,37 @@ describe('Inventário paginado', () => {
   it('envia filtros existentes ao backend e volta à página 1', async () => {
     const store = useMediaStore();
     store.inventoryPage = 2;
-    await store.changeInventoryType('outdoor');
-    expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({ mediaType: 'outdoor', offset: 0 }));
+    await store.changeInventoryType(['outdoor']);
+    expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({ mediaTypes: ['outdoor'], offset: 0 }));
     store.inventoryPage = 2;
     await store.changeInventoryStatus('aprovado');
     expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({
-      mediaType: 'outdoor', status: 'aprovado', offset: 0,
+      mediaTypes: ['outdoor'], status: 'aprovado', offset: 0,
     }));
     expect(store.inventoryPage).toBe(1);
+  });
+
+  it('envia vários tipos e limpar restaura todos, voltando à primeira página', async () => {
+    const store = useMediaStore();
+    store.inventoryPage = 3;
+    await store.changeInventoryType(['outdoor', 'front light']);
+    expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({
+      mediaTypes: ['outdoor', 'front light'], offset: 0,
+    }));
+    store.inventoryPage = 2;
+    await store.changeInventoryType([]);
+    expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({ mediaTypes: [], offset: 0 }));
   });
 
   it('muda o tamanho da página, volta à primeira e preserva filtros', async () => {
     const store = useMediaStore();
     store.inventoryPage = 3;
-    store.inventoryTypeFilter = 'outdoor';
+    store.inventoryTypeFilter = ['outdoor'];
     await store.changeInventoryPageSize(25);
     expect(store.inventoryPage).toBe(1);
     expect(store.inventoryPageCount).toBe(5);
     expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({
-      limit: 25, offset: 0, mediaType: 'outdoor',
+      limit: 25, offset: 0, mediaTypes: ['outdoor'],
     }));
   });
 
@@ -211,12 +223,12 @@ describe('Inventário paginado', () => {
   it('não muda página nem filtros ao atualizar manualmente', async () => {
     const store = useMediaStore();
     store.inventoryPage = 2;
-    store.inventoryTypeFilter = 'outdoor';
+    store.inventoryTypeFilter = ['outdoor'];
     store.inventorySearch = 'Rua';
     store.inventorySearchDraft = 'Rua';
     await store.refreshInventory();
     expect(api.listMediaAssets).toHaveBeenLastCalledWith(expect.objectContaining({
-      offset: 50, limit: 50, search: 'Rua', mediaType: 'outdoor',
+      offset: 50, limit: 50, search: 'Rua', mediaTypes: ['outdoor'],
     }));
     expect(store.inventoryPage).toBe(2);
   });

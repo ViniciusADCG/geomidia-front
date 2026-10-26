@@ -30,7 +30,7 @@ const viewportInFlight = new WeakMap<object, { key: string; promise: Promise<voi
 
 function queryKey(viewport: MapViewport, filters: MapFilters): string {
   return JSON.stringify([viewport.north, viewport.south, viewport.east, viewport.west, viewport.zoom,
-    filters.mediaType ?? null, filters.status ?? null, filters.company ?? null]);
+    filters.mediaType ?? null, filters.mediaTypes ?? [], filters.status ?? null, filters.company ?? null]);
 }
 
 function nextVersion(versions: WeakMap<object, number>, store: object): number {

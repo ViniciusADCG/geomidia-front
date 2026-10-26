@@ -17,12 +17,7 @@
               <SelectItem v-for="option in companyFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
             </SelectContent>
           </Select>
-          <Select v-model="typeFilter">
-            <SelectTrigger class="w-full md:w-48" aria-label="Filtrar por tipo"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="option in typeFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
-            </SelectContent>
-          </Select>
+          <MediaTypeFilter v-model="typeFilter" class="md:w-48" />
           <Select v-model="statusFilter">
             <SelectTrigger class="w-full md:w-44" aria-label="Filtrar por status"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -240,6 +235,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
 import FormField from '@/components/form/FormField.vue';
+import MediaTypeFilter from '@/components/form/MediaTypeFilter.vue';
 import SearchSelect from '@/components/form/SearchSelect.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import AssetDetails from '@/components/map/AssetDetails.vue';
@@ -262,7 +258,6 @@ import { cn } from '@/lib/utils';
 import {
   DECISION_STATUS_OPTIONS,
   DISTRICT_OPTIONS,
-  MEDIA_TYPE_OPTIONS,
   STATUS_OPTIONS,
   getRequiredRadius,
   mediaTypeOptionsFromRules,
@@ -289,7 +284,7 @@ const mapElement = ref<HTMLElement | null>(null);
 const sideStack = ref<HTMLElement | null>(null);
 const detailScrollElement = ref<HTMLElement | null>(null);
 const companyFilter = ref('all');
-const typeFilter = ref<MediaType | 'all'>('all');
+const typeFilter = ref<MediaType[]>([]);
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
 const reviewStatus = ref<MediaStatus>('aprovado');
@@ -318,11 +313,6 @@ const viewportScheduler = createViewportScheduler(loadViewport);
 const companyFilterOptions = computed(() => [
   { title: 'Todas as empresas', value: 'all' },
   ...mapState.companyOptions.map((name) => ({ title: name, value: name })),
-]);
-
-const typeFilterOptions = computed(() => [
-  { title: 'Todos os tipos', value: 'all' },
-  ...MEDIA_TYPE_OPTIONS,
 ]);
 
 const registrationMediaTypeOptions = computed(() => mediaTypeOptionsFromRules(media.rules));
@@ -497,7 +487,7 @@ function loadViewport() {
 function currentFilters() {
   return {
     company: companyFilter.value === 'all' ? undefined : companyFilter.value,
-    mediaType: typeFilter.value === 'all' ? undefined : typeFilter.value,
+    mediaTypes: typeFilter.value,
     status: statusFilter.value === 'all' ? undefined : statusFilter.value,
   };
 }

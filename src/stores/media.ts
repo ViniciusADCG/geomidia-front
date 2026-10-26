@@ -24,7 +24,7 @@ interface MediaState {
   inventoryPageSize: number;
   inventorySearch: string;
   inventorySearchDraft: string;
-  inventoryTypeFilter: MediaType | 'all';
+  inventoryTypeFilter: MediaType[];
   inventoryStatusFilter: MediaStatus | 'all';
   inventoryLoading: boolean;
   inventoryLoaded: boolean;
@@ -105,7 +105,7 @@ export const useMediaStore = defineStore('media', {
     inventoryPageSize: 50,
     inventorySearch: '',
     inventorySearchDraft: '',
-    inventoryTypeFilter: 'all',
+    inventoryTypeFilter: [],
     inventoryStatusFilter: 'all',
     inventoryLoading: false,
     inventoryLoaded: false,
@@ -153,7 +153,7 @@ export const useMediaStore = defineStore('media', {
       try {
         const page = await api.listMediaAssets({
           search: this.inventorySearch || undefined,
-          mediaType: this.inventoryTypeFilter === 'all' ? undefined : this.inventoryTypeFilter,
+          mediaTypes: this.inventoryTypeFilter,
           status: this.inventoryStatusFilter === 'all' ? undefined : this.inventoryStatusFilter,
           limit: this.inventoryPageSize,
           offset: (this.inventoryPage - 1) * this.inventoryPageSize,
@@ -196,8 +196,8 @@ export const useMediaStore = defineStore('media', {
       }
       return this.loadInventory();
     },
-    changeInventoryType(value: MediaType | 'all') {
-      this.inventoryTypeFilter = value;
+    changeInventoryType(value: MediaType[]) {
+      this.inventoryTypeFilter = [...value];
       this.inventoryPage = 1;
       return this.refreshInventory();
     },
