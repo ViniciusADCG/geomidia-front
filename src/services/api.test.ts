@@ -176,3 +176,23 @@ describe('reavaliação individual de raio', () => {
     });
   });
 });
+
+
+describe('filtros de múltiplos tipos', () => {
+  it('envia parâmetros repetidos nas três consultas e omite seleção vazia', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200, ok: true, json: async () => ({}),
+    }));
+    const mediaTypes = ['outdoor', 'front light'] as const;
+    const viewport = { north: -20, south: -21, east: -54, west: -55, zoom: 12 };
+    await api.listMediaAssets({ mediaTypes: [...mediaTypes] });
+    await api.listMapAssets(viewport, { mediaTypes: [...mediaTypes] });
+    await api.listMapClusters(viewport, { mediaTypes: [...mediaTypes] });
+    for (const [url] of vi.mocked(fetch).mock.calls) {
+      expect(new URL(String(url)).searchParams.getAll('media_types')).toEqual(mediaTypes);
+    }
+    vi.mocked(fetch).mockClear();
+    await api.listMediaAssets({ mediaTypes: [] });
+    expect(new URL(String(vi.mocked(fetch).mock.calls[0][0])).searchParams.has('media_types')).toBe(false);
+  });
+});

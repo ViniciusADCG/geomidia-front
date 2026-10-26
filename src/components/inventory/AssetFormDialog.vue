@@ -1,6 +1,11 @@
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="flex max-h-[min(90dvh,60rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+  <Dialog :open="open" @update:open="onDialogOpenChange">
+    <DialogContent
+      class="flex max-h-[min(90dvh,60rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+      :show-close-button="Boolean(asset)"
+      @interact-outside="preventCreateDismiss"
+      @escape-key-down="preventCreateDismiss"
+    >
       <DialogHeader class="shrink-0 gap-0 border-b px-6 pt-6 pb-4 pr-14">
         <DialogTitle class="text-xl tracking-tight">
           {{ editingAsset ? `Editar ${editingAsset.official_process_code || editingAsset.process_code}` : 'Novo cadastro de veículo' }}
@@ -303,6 +308,15 @@ import { formatDateTime } from '@/utils/format';
 // asset = null abre o cadastro; um ativo abre a edição.
 const props = defineProps<{ open: boolean; asset: MediaAsset | null }>();
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
+
+function preventCreateDismiss(event: Event) {
+  if (!props.asset) event.preventDefault();
+}
+
+function onDialogOpenChange(open: boolean) {
+  // O cadastro novo só fecha pelas ações explícitas de cancelar ou salvar.
+  if (open || props.asset) emit('update:open', open);
+}
 
 const AREA_OPTIONS = [
   { title: 'Não', value: 'within_limit' },

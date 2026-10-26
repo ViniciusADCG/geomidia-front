@@ -17,12 +17,7 @@
           label="Buscar no inventário"
           @update:model-value="media.scheduleInventorySearch($event)"
         />
-        <Select :model-value="media.inventoryTypeFilter" @update:model-value="media.changeInventoryType($event as typeof media.inventoryTypeFilter)">
-          <SelectTrigger class="w-full" aria-label="Filtrar por tipo"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="option in typeFilterOptions" :key="option.value" :value="option.value">{{ option.title }}</SelectItem>
-          </SelectContent>
-        </Select>
+        <MediaTypeFilter :model-value="media.inventoryTypeFilter" @update:model-value="media.changeInventoryType($event)" />
         <Select :model-value="media.inventoryStatusFilter" @update:model-value="media.changeInventoryStatus($event as typeof media.inventoryStatusFilter)">
           <SelectTrigger class="w-full" aria-label="Filtrar por status"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -195,6 +190,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import SearchInput from '@/components/common/SearchInput.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import TablePager from '@/components/common/TablePager.vue';
+import MediaTypeFilter from '@/components/form/MediaTypeFilter.vue';
 import AssetFormDialog from '@/components/inventory/AssetFormDialog.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -211,7 +207,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { MEDIA_TYPE_OPTIONS, STATUS_OPTIONS, mediaTypeLabel } from '../domain/rules';
+import { STATUS_OPTIONS, mediaTypeLabel } from '../domain/rules';
 import { useAuthStore } from '../stores/auth';
 import { useMediaStore } from '../stores/media';
 import type { MediaAsset } from '../types';
@@ -226,7 +222,7 @@ const editingAsset = ref<MediaAsset | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
 const visibleInventoryItems = computed(() => media.inventoryLoading || media.inventoryError ? [] : media.inventoryItems);
 const hasInventoryFilters = computed(() => Boolean(media.inventorySearch || media.inventorySearchDraft.trim()
-  || media.inventoryTypeFilter !== 'all' || media.inventoryStatusFilter !== 'all'));
+  || media.inventoryTypeFilter.length > 0 || media.inventoryStatusFilter !== 'all'));
 const emptyTitle = computed(() => {
   if (!media.inventoryLoaded) return 'Carregando inventário';
   if (media.inventoryTotal === 0 && !hasInventoryFilters.value) return 'Nenhum veículo cadastrado';
@@ -234,11 +230,6 @@ const emptyTitle = computed(() => {
   return 'Esta página está vazia. Atualize o inventário.';
 });
 onMounted(() => { void media.refreshInventory(); });
-
-const typeFilterOptions = computed(() => [
-  { title: 'Todos os tipos', value: 'all' },
-  ...MEDIA_TYPE_OPTIONS,
-]);
 
 const statusFilterOptions = computed(() => [
   { title: 'Todos os status', value: 'all' },

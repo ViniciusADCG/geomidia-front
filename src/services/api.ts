@@ -113,10 +113,11 @@ async function requestPdf(path: string): Promise<Blob> {
   return response.blob();
 }
 
-function queryString(params: Record<string, string | number | undefined>): string {
+function queryString(params: Record<string, string | number | string[] | undefined>): string {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') query.set(key, String(value));
+    if (Array.isArray(value)) value.forEach((item) => query.append(key, item));
+    else if (value !== undefined && value !== '') query.set(key, String(value));
   });
   const encoded = query.toString();
   return encoded ? `?${encoded}` : '';
@@ -135,6 +136,7 @@ export const api = {
   listMediaAssets(params: {
     search?: string;
     mediaType?: MediaType;
+    mediaTypes?: MediaType[];
     status?: MediaStatus;
     district?: string;
     company?: string;
@@ -144,6 +146,7 @@ export const api = {
     return request<Page<MediaAsset>>(`/media-assets${queryString({
       search: params.search,
       media_type: params.mediaType,
+      media_types: params.mediaTypes,
       status: params.status,
       district: params.district,
       company: params.company,
@@ -158,6 +161,7 @@ export const api = {
       east: viewport.east,
       west: viewport.west,
       media_type: filters.mediaType,
+      media_types: filters.mediaTypes,
       status: filters.status,
       company: filters.company,
     })}`);
@@ -170,6 +174,7 @@ export const api = {
       west: viewport.west,
       zoom: viewport.zoom,
       media_type: filters.mediaType,
+      media_types: filters.mediaTypes,
       status: filters.status,
       company: filters.company,
     })}`);
