@@ -170,6 +170,7 @@
           <CircleAlert />
           <AlertDescription>{{ media.error }}</AlertDescription>
         </Alert>
+        <DeletionReasonField v-model="deleteReason" :invalid="deleteReasonAttempted && !deleteReason.trim()" />
         <AlertDialogFooter>
           <Button variant="outline" @click="deleteTarget = null">Cancelar</Button>
           <Button variant="destructive" :disabled="media.saving" @click="confirmDelete">
@@ -190,6 +191,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import SearchInput from '@/components/common/SearchInput.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import TablePager from '@/components/common/TablePager.vue';
+import DeletionReasonField from '@/components/form/DeletionReasonField.vue';
 import MediaTypeFilter from '@/components/form/MediaTypeFilter.vue';
 import AssetFormDialog from '@/components/inventory/AssetFormDialog.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
@@ -220,6 +222,8 @@ const auth = useAuthStore();
 const dialog = ref(false);
 const editingAsset = ref<MediaAsset | null>(null);
 const deleteTarget = ref<MediaAsset | null>(null);
+const deleteReason = ref('');
+const deleteReasonAttempted = ref(false);
 const visibleInventoryItems = computed(() => media.inventoryLoading || media.inventoryError ? [] : media.inventoryItems);
 const hasInventoryFilters = computed(() => Boolean(media.inventorySearch || media.inventorySearchDraft.trim()
   || media.inventoryTypeFilter.length > 0 || media.inventoryStatusFilter !== 'all'));
@@ -248,6 +252,8 @@ function openEditDialog(asset: MediaAsset) {
 
 function askDelete(asset: MediaAsset) {
   media.error = null;
+  deleteReason.value = '';
+  deleteReasonAttempted.value = false;
   deleteTarget.value = asset;
 }
 
@@ -261,9 +267,11 @@ async function startAnalysis(asset: MediaAsset) {
 
 async function confirmDelete() {
   if (!auth.canWrite || !deleteTarget.value) return;
+  deleteReasonAttempted.value = true;
+  if (!deleteReason.value.trim()) return;
   try {
     const assetId = deleteTarget.value.id;
-    await media.runInventoryMutation(() => media.deleteAsset(assetId));
+    await media.runInventoryMutation(() => media.deleteAsset(assetId, deleteReason.value.trim()));
     deleteTarget.value = null;
   } catch {
     // O store publica o erro no alerta global.

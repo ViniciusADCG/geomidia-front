@@ -196,3 +196,19 @@ describe('filtros de múltiplos tipos', () => {
     expect(new URL(String(vi.mocked(fetch).mock.calls[0][0])).searchParams.has('media_types')).toBe(false);
   });
 });
+
+describe('exclusão com justificativa', () => {
+  it('envia o motivo no corpo das duas rotas de exclusão', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 204, ok: true }));
+    await api.deleteMediaAsset('asset-1', 'Cadastro duplicado confirmado.');
+    await api.deleteApplicationForm('form-1', 'Solicitação vinculada ao cadastro errado.');
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      '/api/media-assets/asset-1', '/api/application-forms/form-1',
+    ]);
+    expect(calls.map(([, options]) => options?.method)).toEqual(['DELETE', 'DELETE']);
+    expect(calls.map(([, options]) => JSON.parse(String(options?.body)).reason)).toEqual([
+      'Cadastro duplicado confirmado.', 'Solicitação vinculada ao cadastro errado.',
+    ]);
+  });
+});

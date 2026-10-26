@@ -227,6 +227,48 @@ export interface LinkedApplicationFormResult {
   asset: MediaAsset;
 }
 
+export interface ProcessTimelineEvent {
+  at: string;
+  before: MediaStatus | null;
+  after: MediaStatus | null;
+  analyst_id: string | null;
+  analyst_name: string | null;
+  analyst_role_inferred: boolean;
+  is_entry: boolean;
+  is_deletion: boolean;
+}
+
+export interface TrackedProcess {
+  asset_id: string | null;
+  process_code: string;
+  official_process_code: string | null;
+  current_status: MediaStatus | null;
+  created_at: string | null;
+  deleted_at: string | null;
+  deletion_reason: string | null;
+  analysis_started_at: string | null;
+  first_approved_at: string | null;
+  seconds_to_analysis: number | null;
+  seconds_analysis_to_approval: number | null;
+  seconds_to_approval: number | null;
+  seconds_in_current_status: number | null;
+  timeline: ProcessTimelineEvent[];
+}
+
+export interface AnalystActivitySummary {
+  id: string;
+  name: string;
+  processes_touched: number;
+  actions: number;
+  analyses_started: number;
+  approvals: number;
+}
+
+export interface TrackedAnalyst {
+  id: string;
+  name: string;
+}
+
 export interface ActivityLog {
   id: string;
   asset_id?: string | null;

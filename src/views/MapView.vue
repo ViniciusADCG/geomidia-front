@@ -176,7 +176,7 @@
               v-if="auth.canDelete"
               variant="ghost"
               class="justify-self-start text-destructive hover:bg-danger-soft hover:text-destructive"
-              @click="media.error = null; confirmDelete = true"
+              @click="media.error = null; deleteReason = ''; deleteReasonAttempted = false; confirmDelete = true"
             >
               <Trash2 />
               Excluir ponto
@@ -204,6 +204,7 @@
           <CircleAlert />
           <AlertDescription>{{ media.error }}</AlertDescription>
         </Alert>
+        <DeletionReasonField v-model="deleteReason" :invalid="deleteReasonAttempted && !deleteReason.trim()" />
         <AlertDialogFooter>
           <Button variant="outline" @click="confirmDelete = false">Cancelar</Button>
           <Button variant="destructive" :disabled="media.saving" @click="deleteSelected">
@@ -235,6 +236,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
 import FormField from '@/components/form/FormField.vue';
+import DeletionReasonField from '@/components/form/DeletionReasonField.vue';
 import MediaTypeFilter from '@/components/form/MediaTypeFilter.vue';
 import SearchSelect from '@/components/form/SearchSelect.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
@@ -293,6 +295,8 @@ const reviewAttachmentLinks = ref<string[]>([]);
 const draft = reactive<MediaAssetInput>(blankDraft());
 const draftAttempted = ref(false);
 const confirmDelete = ref(false);
+const deleteReason = ref('');
+const deleteReasonAttempted = ref(false);
 const AREA_OPTIONS = [
   { title: 'Não', value: 'within_limit' },
   { title: 'Sim', value: 'above_limit' },
@@ -617,9 +621,11 @@ async function startSelectedAnalysis() {
 
 async function deleteSelected() {
   if (!selectedAsset.value) return;
+  deleteReasonAttempted.value = true;
+  if (!deleteReason.value.trim()) return;
   media.error = null;
   try {
-    await media.deleteAsset(selectedAsset.value.id);
+    await media.deleteAsset(selectedAsset.value.id, deleteReason.value.trim());
     void mapState.selectAsset(null, auth.canWrite);
     refreshMap();
     void mapState.loadCompanyOptions();

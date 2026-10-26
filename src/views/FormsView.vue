@@ -282,6 +282,7 @@
           <CircleAlert />
           <AlertDescription>{{ message }}</AlertDescription>
         </Alert>
+        <DeletionReasonField v-model="deleteReason" :invalid="deleteReasonAttempted && !deleteReason.trim()" />
         <AlertDialogFooter>
           <Button variant="outline" @click="deleteTarget = null">Cancelar</Button>
           <Button variant="destructive" :disabled="saving" @click="confirmDelete">
@@ -318,6 +319,7 @@ import SearchInput from '@/components/common/SearchInput.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import TablePager from '@/components/common/TablePager.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
+import DeletionReasonField from '@/components/form/DeletionReasonField.vue';
 import FormField from '@/components/form/FormField.vue';
 import SearchSelect from '@/components/form/SearchSelect.vue';
 import FormSection from '@/components/form/FormSection.vue';
@@ -361,6 +363,8 @@ const formList = useApplicationFormList();
 const dialog = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<ApplicationForm | null>(null);
+const deleteReason = ref('');
+const deleteReasonAttempted = ref(false);
 const attempted = ref(false);
 const saving = ref(false);
 const locating = ref(false);
@@ -497,6 +501,8 @@ function resetAttachments(value: string | null | undefined) {
 
 function askDelete(item: ApplicationForm) {
   message.value = '';
+  deleteReason.value = '';
+  deleteReasonAttempted.value = false;
   deleteTarget.value = item;
 }
 
@@ -549,9 +555,11 @@ async function save() {
 
 async function confirmDelete() {
   if (!deleteTarget.value) return;
+  deleteReasonAttempted.value = true;
+  if (!deleteReason.value.trim()) return;
   saving.value = true;
   try {
-    await api.deleteApplicationForm(deleteTarget.value.id);
+    await api.deleteApplicationForm(deleteTarget.value.id, deleteReason.value.trim());
     deleteTarget.value = null;
     await formList.load();
     showMessage('Solicitação e ponto removidos do sistema.', 'success');
