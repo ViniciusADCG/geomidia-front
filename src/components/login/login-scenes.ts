@@ -626,11 +626,12 @@ function blimp(ctx: CanvasRenderingContext2D, cx: number, cy: number, u: number,
   ctx.beginPath();
   ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
   ctx.fill();
+  // Cauda à esquerda: o dirigível atravessa o céu da esquerda para a direita.
   ctx.fillStyle = NAVY;
   ctx.beginPath();
-  ctx.moveTo(x + w * 0.42, y);
-  ctx.lineTo(x + w * 0.56, y - h * 0.42);
-  ctx.lineTo(x + w * 0.56, y + h * 0.42);
+  ctx.moveTo(x - w * 0.42, y);
+  ctx.lineTo(x - w * 0.56, y - h * 0.42);
+  ctx.lineTo(x - w * 0.56, y + h * 0.42);
   ctx.closePath();
   ctx.fill();
   ctx.fillRect(x - 14 * u, y + h / 2 - 2 * u, 28 * u, 9 * u);
@@ -640,7 +641,7 @@ function blimp(ctx: CanvasRenderingContext2D, cx: number, cy: number, u: number,
   }
   const pw = w * 0.6;
   const ph = h * 0.46;
-  ctx.drawImage(face(banner, pw, ph, light.dk > 0.4), x - pw / 2 - w * 0.04, y - ph / 2, pw, ph);
+  ctx.drawImage(face(banner, pw, ph, light.dk > 0.4), x - pw / 2 + w * 0.04, y - ph / 2, pw, ph);
   ctx.shadowBlur = 0;
   // Luzes de navegação que correm pela barriga à noite.
   if (light.dk > 0.3) {
