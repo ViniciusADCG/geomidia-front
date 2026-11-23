@@ -114,6 +114,7 @@ export interface MapViewport {
 }
 
 export interface MapFilters {
+  search?: string;
   mediaType?: MediaType;
   mediaTypes?: MediaType[];
   status?: MediaStatus;

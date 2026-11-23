@@ -6,6 +6,7 @@
       type="search"
       :placeholder="placeholder"
       :aria-label="label ?? placeholder"
+      :maxlength="maxlength"
       class="pl-9"
       @update:model-value="emit('update:modelValue', String($event))"
       @keydown.enter="emit('submit')"
@@ -24,6 +25,7 @@ const props = defineProps<{
   modelValue: string;
   placeholder?: string;
   label?: string;
+  maxlength?: number;
   class?: HTMLAttributes['class'];
 }>();
 
