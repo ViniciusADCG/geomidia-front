@@ -7,6 +7,7 @@ import type {
   LoginResponse,
   MapAssetPage,
   MapClusterPage,
+  MapSearchSummary,
   MapFilters,
   MapViewport,
   LinkedApplicationFormResult,
@@ -186,6 +187,12 @@ export const api = {
   },
   listMapCompanyOptions() {
     return request<string[]>('/media-assets/map/company-options');
+  },
+  mapSearchSummary(filters: MapFilters) {
+    return request<MapSearchSummary>(`/media-assets/map/search-summary${queryString({
+      search: filters.search, media_type: filters.mediaType, media_types: filters.mediaTypes,
+      status: filters.status, company: filters.company,
+    })}`);
   },
   createMediaAsset(input: MediaAssetInput) {
     return request<MediaAsset>('/media-assets', { method: 'POST', body: JSON.stringify(input) });

@@ -30,7 +30,14 @@
 
     <div class="mb-4 rounded-lg border bg-card p-4">
       <SearchInput v-model="searchFilter" placeholder="Endereço, bairro, processo ou empresa" label="Buscar no mapa" :maxlength="120" />
-      <p class="mt-2 text-sm text-muted-foreground">A busca considera os ativos na área visível do mapa.</p>
+      <p v-if="searchFilter.trim()" class="mt-2 text-sm text-muted-foreground" aria-live="polite">
+        <template v-if="searchSummaryLoading">Buscando veículos...</template>
+        <template v-else-if="searchSummaryError">Não foi possível localizar os resultados. <button type="button" class="underline" @click="scheduleSearchSummary">Tentar novamente</button></template>
+        <template v-else-if="searchSummary">
+          {{ searchSummary.total }} {{ searchSummary.total === 1 ? 'resultado encontrado' : 'resultados encontrados' }}
+          <template v-if="searchSummary.total"> · Tipos: {{ searchSummary.media_types.map(mediaTypeLabel).join(', ') }}. Os resultados estão destacados em vermelho.</template>
+        </template>
+      </p>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_25rem]">
@@ -239,6 +246,7 @@ import {
 import L from 'leaflet';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { api } from '@/services/api';
 
 import EmptyState from '@/components/common/EmptyState.vue';
 import SearchInput from '@/components/common/SearchInput.vue';
@@ -278,7 +286,7 @@ import {
 import { useMediaStore } from '../stores/media';
 import { useMapStore } from '../stores/map';
 import { useAuthStore } from '../stores/auth';
-import type { ApplicationFormAttachment, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
+import type { ApplicationFormAttachment, MapSearchSummary, MediaAsset, MediaAssetInput, MediaStatus, MediaType } from '../types';
 import { openApplicationFormAttachment } from '../utils/application-form-attachments';
 import { joinAttachmentLinks, parseAttachmentLinks } from '../utils/attachment-links';
 import { createMapAssetLayerRenderer } from '../utils/map-asset-layers';
@@ -297,6 +305,11 @@ const sideStack = ref<HTMLElement | null>(null);
 const detailScrollElement = ref<HTMLElement | null>(null);
 const companyFilter = ref('all');
 const searchFilter = ref('');
+const searchSummary = ref<MapSearchSummary | null>(null);
+const searchSummaryLoading = ref(false);
+const searchSummaryError = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let searchVersion = 0;
 const typeFilter = ref<MediaType[]>([]);
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
@@ -351,6 +364,7 @@ const analysis = computed(() => (
 watch(() => [mapState.items, mapState.clusters, mapState.selectedAssetId], renderAssets);
 
 watch([companyFilter, typeFilter, statusFilter, searchFilter], scheduleViewportLoad);
+watch([companyFilter, typeFilter, statusFilter, searchFilter], scheduleSearchSummary);
 
 watch(() => route.query.asset, (id) => {
   if (typeof id === 'string' && id !== mapState.selectedAssetId) void mapState.selectAsset(id, auth.canWrite);
@@ -428,6 +442,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchVersion++;
   viewportScheduler.cancel();
   window.removeEventListener('geomidia:map-refresh', refreshMap);
   mapState.invalidate();
@@ -491,6 +507,30 @@ function addPublicPropertiesLegend() {
 
 function currentViewport() {
   return map ? readMapViewport(map) : null;
+}
+
+function scheduleSearchSummary() {
+  if (searchTimer) clearTimeout(searchTimer);
+  const version = ++searchVersion;
+  const filters = currentFilters();
+  searchSummary.value = null;
+  searchSummaryError.value = false;
+  searchSummaryLoading.value = Boolean(filters.search);
+  if (!filters.search) return;
+  searchTimer = setTimeout(async () => {
+    try {
+      const summary = await api.mapSearchSummary(filters);
+      if (version !== searchVersion) return;
+      searchSummary.value = summary;
+      if (summary.total && summary.south != null && summary.west != null && summary.north != null && summary.east != null) {
+        map?.fitBounds([[summary.south, summary.west], [summary.north, summary.east]], { padding: [45, 45], maxZoom: 15 });
+      }
+    } catch {
+      if (version === searchVersion) searchSummaryError.value = true;
+    } finally {
+      if (version === searchVersion) searchSummaryLoading.value = false;
+    }
+  }, 400);
 }
 
 function loadViewport() {

@@ -123,7 +123,16 @@ export interface MapFilters {
 
 export type MapAssetSummary = Pick<MediaAsset,
   'id' | 'latitude' | 'longitude' | 'radius_meters' | 'media_type' | 'status'
-  | 'process_code' | 'official_process_code' | 'company_responsible' | 'contact_name'>;
+  | 'process_code' | 'official_process_code' | 'company_responsible' | 'contact_name'> & { search_match?: boolean };
+
+export interface MapSearchSummary {
+  total: number;
+  media_types: MediaType[];
+  north: number | null;
+  south: number | null;
+  east: number | null;
+  west: number | null;
+}
 
 export interface MapAssetPage {
   items: MapAssetSummary[];
@@ -137,6 +146,7 @@ export interface MapCluster {
   count: number;
   latitude: number;
   longitude: number;
+  search_matches?: number;
 }
 
 export interface MapClusterPage {

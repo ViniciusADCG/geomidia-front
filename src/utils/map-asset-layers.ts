@@ -5,7 +5,7 @@ import type { MapAssetSummary, MapCluster } from '../types';
 
 type VisualAsset = Pick<MapAssetSummary,
   'latitude' | 'longitude' | 'radius_meters' | 'media_type' | 'status'
-  | 'process_code' | 'official_process_code'> & { selected: boolean };
+  | 'process_code' | 'official_process_code'> & { selected: boolean; searchMatch: boolean };
 
 interface VehicleLayers {
   circle: L.Circle;
@@ -30,6 +30,7 @@ function visualAsset(asset: MapAssetSummary, selectedId: string | null): VisualA
     process_code: asset.process_code,
     official_process_code: asset.official_process_code,
     selected: asset.id === selectedId,
+    searchMatch: Boolean(asset.search_match),
   };
 }
 
@@ -46,16 +47,18 @@ function circleStyle(visual: VisualAsset) {
 
 function markerStyle(visual: VisualAsset) {
   return {
-    radius: visual.selected ? 9 : 7,
-    color: '#ffffff',
-    weight: 2,
+    radius: visual.searchMatch ? 11 : visual.selected ? 9 : 7,
+    color: visual.searchMatch ? '#b42318' : '#ffffff',
+    weight: visual.searchMatch ? 4 : 2,
     fillColor: mediaTypeColor(visual.media_type),
     fillOpacity: 1,
   };
 }
 
 function tooltip(visual: VisualAsset) {
-  return `${visual.official_process_code || visual.process_code} · ${mediaTypeLabel(visual.media_type)}`;
+  const codes = visual.official_process_code && visual.official_process_code !== visual.process_code
+    ? `${visual.official_process_code} · ${visual.process_code}` : visual.process_code;
+  return `${codes} · ${mediaTypeLabel(visual.media_type)}`;
 }
 
 function circleTooltip(visual: VisualAsset) {
@@ -74,14 +77,14 @@ export function createMapAssetLayerRenderer({ leaflet, layer, onAssetClick, onCl
       vehicles.clear();
       for (const cluster of clusters) {
         const icon = leaflet.divIcon({
-          className: 'map-cluster-icon',
+          className: cluster.search_matches ? 'map-cluster-icon map-cluster-icon--match' : 'map-cluster-icon',
           html: `<span>${cluster.count}</span>`,
           iconSize: [48, 48],
           iconAnchor: [24, 24],
         });
         leaflet.marker([cluster.latitude, cluster.longitude], {
           icon,
-          title: `${cluster.count} veículos nesta região`,
+          title: `${cluster.count} veículos nesta região${cluster.search_matches ? ` · ${cluster.search_matches} correspondem à busca` : ''}`,
         }).on('click', (event) => onClusterClick(cluster, event)).addTo(layer);
       }
       showingClusters = true;
@@ -123,9 +126,10 @@ export function createMapAssetLayerRenderer({ leaflet, layer, onAssetClick, onCl
         existing.marker.setLatLng(latLng);
       }
       if (previous.radius_meters !== next.radius_meters) existing.circle.setRadius(next.radius_meters);
-      if (previous.media_type !== next.media_type || previous.status !== next.status || previous.selected !== next.selected) {
+      if (previous.media_type !== next.media_type || previous.status !== next.status || previous.selected !== next.selected || previous.searchMatch !== next.searchMatch) {
         existing.circle.setStyle(circleStyle(next));
         existing.marker.setStyle(markerStyle(next));
+        if (next.searchMatch) existing.marker.bringToFront();
       }
       if (previous.process_code !== next.process_code
         || previous.official_process_code !== next.official_process_code
@@ -141,6 +145,9 @@ export function createMapAssetLayerRenderer({ leaflet, layer, onAssetClick, onCl
       layer.removeLayer(existing.circle);
       layer.removeLayer(existing.marker);
       vehicles.delete(id);
+    }
+    for (const vehicle of vehicles.values()) {
+      if (vehicle.visual.searchMatch) vehicle.marker.bringToFront();
     }
   }
 

@@ -23,6 +23,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.map-cluster-icon--match {
+  border-color: #b42318;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #b42318, 0 2px 8px rgb(27 36 99 / 0.35);
+}
+
 .public-properties-legend {
   display: flex;
   align-items: center;
