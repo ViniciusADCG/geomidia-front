@@ -105,7 +105,10 @@
               <Input :id="id" v-model="formDetails.requester_email" type="email" :aria-invalid="invalid || undefined" />
             </FormField>
           </template>
-          <FormField v-slot="{ id }" label="Contato do solicitante">
+          <FormField v-if="!selectedForm" v-slot="{ id }" label="Empresa ou responsável" hint="Selecione uma empresa existente ou digite um novo nome.">
+            <CompanyInput :id="id" v-model="form.contact_name" />
+          </FormField>
+          <FormField v-else v-slot="{ id }" label="Contato do solicitante">
             <Input :id="id" :model-value="form.contact_name ?? ''" @update:model-value="form.contact_name = String($event)" />
           </FormField>
           <FormField v-if="!selectedForm" v-slot="{ id }" label="E-mail do solicitante">
@@ -272,6 +275,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
+import CompanyInput from '@/components/form/CompanyInput.vue';
 import FormField from '@/components/form/FormField.vue';
 import SearchSelect from '@/components/form/SearchSelect.vue';
 import FormSection from '@/components/form/FormSection.vue';

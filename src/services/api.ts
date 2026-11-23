@@ -159,6 +159,7 @@ export const api = {
   },
   listMapAssets(viewport: MapViewport, filters: MapFilters = {}) {
     return request<MapAssetPage>(`/media-assets/map${queryString({
+      search: filters.search,
       north: viewport.north,
       south: viewport.south,
       east: viewport.east,
@@ -171,6 +172,7 @@ export const api = {
   },
   listMapClusters(viewport: MapViewport, filters: MapFilters = {}) {
     return request<MapClusterPage>(`/media-assets/map/clusters${queryString({
+      search: filters.search,
       north: viewport.north,
       south: viewport.south,
       east: viewport.east,

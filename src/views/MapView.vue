@@ -28,6 +28,11 @@
       </template>
     </PageHeader>
 
+    <div class="mb-4 rounded-lg border bg-card p-4">
+      <SearchInput v-model="searchFilter" placeholder="Endereço, bairro, processo ou empresa" label="Buscar no mapa" :maxlength="120" />
+      <p class="mt-2 text-sm text-muted-foreground">A busca considera os ativos na área visível do mapa.</p>
+    </div>
+
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_25rem]">
       <div class="relative isolate overflow-hidden rounded-lg border bg-card">
         <div ref="mapElement" class="h-[60dvh] w-full lg:h-full" />
@@ -69,6 +74,9 @@
               {{ draft.latitude.toFixed(5) }}, {{ draft.longitude.toFixed(5) }}
             </span>
           </div>
+          <FormField v-slot="{ id }" label="Empresa ou responsável" hint="Selecione uma empresa existente ou digite um novo nome.">
+            <CompanyInput :id="id" v-model="draft.contact_name" />
+          </FormField>
           <FormField v-slot="{ id }" label="Tipo de veículo">
             <SearchSelect :id="id" v-model="draft.media_type" :options="registrationMediaTypeOptions" search-label="Buscar tipo de veículo" list-label="Tipos de veículo" />
           </FormField>
@@ -233,8 +241,10 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router';
 
 import EmptyState from '@/components/common/EmptyState.vue';
+import SearchInput from '@/components/common/SearchInput.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import AttachmentLinksEditor from '@/components/form/AttachmentLinksEditor.vue';
+import CompanyInput from '@/components/form/CompanyInput.vue';
 import FormField from '@/components/form/FormField.vue';
 import DeletionReasonField from '@/components/form/DeletionReasonField.vue';
 import MediaTypeFilter from '@/components/form/MediaTypeFilter.vue';
@@ -286,6 +296,7 @@ const mapElement = ref<HTMLElement | null>(null);
 const sideStack = ref<HTMLElement | null>(null);
 const detailScrollElement = ref<HTMLElement | null>(null);
 const companyFilter = ref('all');
+const searchFilter = ref('');
 const typeFilter = ref<MediaType[]>([]);
 const statusFilter = ref<MediaStatus | 'all'>('all');
 const mode = ref<'analysis' | 'form'>('analysis');
@@ -339,7 +350,7 @@ const analysis = computed(() => (
 
 watch(() => [mapState.items, mapState.clusters, mapState.selectedAssetId], renderAssets);
 
-watch([companyFilter, typeFilter, statusFilter], scheduleViewportLoad);
+watch([companyFilter, typeFilter, statusFilter, searchFilter], scheduleViewportLoad);
 
 watch(() => route.query.asset, (id) => {
   if (typeof id === 'string' && id !== mapState.selectedAssetId) void mapState.selectAsset(id, auth.canWrite);
@@ -490,6 +501,7 @@ function loadViewport() {
 
 function currentFilters() {
   return {
+    search: searchFilter.value.trim() || undefined,
     company: companyFilter.value === 'all' ? undefined : companyFilter.value,
     mediaTypes: typeFilter.value,
     status: statusFilter.value === 'all' ? undefined : statusFilter.value,
