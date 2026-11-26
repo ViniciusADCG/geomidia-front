@@ -67,7 +67,7 @@
       <DetailItem v-if="asset.expiration_date" label="Vencimento">{{ formatDate(asset.expiration_date) }}</DetailItem>
       <DetailItem v-if="asset.width_m != null" label="Largura"><span class="tabular">{{ asset.width_m }} m</span></DetailItem>
       <DetailItem v-if="asset.top_height_m != null" label="Borda superior"><span class="tabular">{{ asset.top_height_m }} m</span></DetailItem>
-      <DetailItem v-if="form?.number_of_faces" label="Faces">{{ form.number_of_faces }}</DetailItem>
+      <DetailItem label="Quantidade de faces">{{ numberOfFaces || 'Não informada' }}</DetailItem>
     </DetailSection>
 
     <section v-if="attachments.length || links.length" class="grid gap-2">
@@ -114,6 +114,10 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ 'open-attachment': [attachment: ApplicationFormAttachment] }>();
+
+const numberOfFaces = computed(() => (
+  props.form ? props.form.number_of_faces?.trim() : props.asset.number_of_faces?.trim()
+));
 
 // Documentos primeiro, imagens depois, como na versão anterior.
 const attachments = computed(() => {
