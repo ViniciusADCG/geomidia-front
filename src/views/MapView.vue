@@ -549,10 +549,13 @@ function renderAssets() {
   assetLayerRenderer?.render(mapState.items, mapState.clusters, mapState.tooMany, mapState.selectedAssetId);
 }
 
-function selectMapAsset(assetId: string, event: L.LeafletMouseEvent) {
-  event.originalEvent.stopPropagation();
+async function selectMapAsset(assetId: string) {
   mode.value = 'analysis';
   void mapState.selectAsset(assetId, auth.canWrite);
+  if (window.matchMedia('(width < 64rem)').matches) {
+    await nextTick();
+    sideStack.value?.scrollIntoView({ block: 'nearest' });
+  }
 }
 
 function handleMapClick(event: L.LeafletMouseEvent) {
