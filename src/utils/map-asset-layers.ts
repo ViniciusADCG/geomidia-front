@@ -37,6 +37,7 @@ function visualAsset(asset: MapAssetSummary, selectedId: string | null): VisualA
 function circleStyle(visual: VisualAsset) {
   const color = mediaTypeColor(visual.media_type);
   return {
+    bubblingMouseEvents: false,
     radius: visual.radius_meters,
     color: visual.selected ? '#b42318' : color,
     fillColor: color,
@@ -47,6 +48,7 @@ function circleStyle(visual: VisualAsset) {
 
 function markerStyle(visual: VisualAsset) {
   return {
+    bubblingMouseEvents: false,
     radius: visual.searchMatch ? 11 : visual.selected ? 9 : 7,
     color: visual.searchMatch ? '#b42318' : '#ffffff',
     weight: visual.searchMatch ? 4 : 2,

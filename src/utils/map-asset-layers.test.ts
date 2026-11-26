@@ -139,6 +139,18 @@ describe('layers incrementais dos veículos no Mapa', () => {
     expect(view.leaflet.circle).toHaveBeenCalledTimes(2);
   });
 
+  it('seleciona o veículo pelo marcador ou pelo raio sem propagar o clique ao mapa', () => {
+    const view = fixture();
+    view.renderer.render([asset('a')], [], false, null);
+    const event = {} as L.LeafletMouseEvent;
+
+    expect(view.leaflet.circle).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ bubblingMouseEvents: false }));
+    expect(view.leaflet.circleMarker).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ bubblingMouseEvents: false }));
+    view.markers[0].handlers.get('click')?.(event);
+    view.circles[0].handlers.get('click')?.(event);
+    expect(view.onAssetClick.mock.calls).toEqual([['a', event], ['a', event]]);
+  });
+
   it('destaca correspondências e remove o destaque quando a busca é refinada', () => {
     const view = fixture();
     view.renderer.render([asset('a', { search_match: true }), asset('b')], [], false, null);
