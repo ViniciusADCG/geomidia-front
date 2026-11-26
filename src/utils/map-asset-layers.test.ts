@@ -151,6 +151,15 @@ describe('layers incrementais dos veículos no Mapa', () => {
     expect(view.onAssetClick.mock.calls).toEqual([['a', event], ['a', event]]);
   });
 
+  it('destaca correspondências e remove o destaque quando a busca é refinada', () => {
+    const view = fixture();
+    view.renderer.render([asset('a', { search_match: true }), asset('b')], [], false, null);
+    expect(view.leaflet.circleMarker).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({ radius: 11, color: '#b42318' }));
+    view.renderer.render([asset('a'), asset('b', { search_match: true })], [], false, null);
+    expect(view.markers[0].setStyle).toHaveBeenCalledWith(expect.objectContaining({ radius: 7 }));
+    expect(view.markers[1].setStyle).toHaveBeenCalledWith(expect.objectContaining({ radius: 11, color: '#b42318' }));
+  });
+
   it('reconstrói clusters somente quando a coleção muda e volta aos veículos individuais', () => {
     const view = fixture();
     const clusters: MapCluster[] = [{ id: 'cell-1', count: 5237, latitude: -20.46, longitude: -54.61 }];
