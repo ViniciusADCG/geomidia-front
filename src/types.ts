@@ -83,6 +83,7 @@ export interface MediaAsset {
   status: MediaStatus;
   company_responsible?: string | null;
   company_cnpj?: string | null;
+  number_of_faces?: string | null;
   justification?: string | null;
   attachment_links?: string | null;
   contact_name?: string | null;
